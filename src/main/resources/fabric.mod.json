@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "id": "nguhroutes",
+  "version": "${version}",
+  "name": "nguhroutes",
+  "description": "Route planning for Cenrail and more",
+  "authors": [],
+  "contact": {},
+  "license": "All-Rights-Reserved",
+  "icon": "assets/nguhroutes/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "fabric-datagen": [
+      "org.nguhroutes.nguhroutes.client.NguhroutesDataGenerator"
+    ],
+    "client": [
+      "org.nguhroutes.nguhroutes.client.NguhroutesClient"
+    ],
+    "main": [
+      "org.nguhroutes.nguhroutes.Nguhroutes"
+    ]
+  },
+  "mixins": [
+    "nguhroutes.mixins.json",
+    {
+      "config": "nguhroutes.client.mixins.json",
+      "environment": "client"
+    }
+  ],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric-language-kotlin": ">=${kotlin_loader_version}",
+    "fabric": "*",
+    "minecraft": "${minecraft_version}"
+  }
+}
