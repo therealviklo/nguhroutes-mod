@@ -1,6 +1,7 @@
 package org.nguhroutes.nguhroutes.client
 
 import com.mojang.brigadier.CommandDispatcher
+import com.mojang.brigadier.arguments.StringArgumentType
 import com.mojang.brigadier.builder.LiteralArgumentBuilder
 import com.mojang.brigadier.context.CommandContext
 import kotlinx.serialization.json.Json
@@ -15,7 +16,7 @@ import java.util.concurrent.atomic.AtomicReference
 
 
 class NguhroutesClient : ClientModInitializer {
-    var stuff: AtomicReference<JsonData> = AtomicReference(null)
+    var jsonData: AtomicReference<JsonData?> = AtomicReference(null)
 
     init {
         loadJson()
@@ -26,7 +27,7 @@ class NguhroutesClient : ClientModInitializer {
             val url = URI("https://nguhroutes.viklo.workers.dev/json/routes.json").toURL()
             val data = url.openStream().readAllBytes().decodeToString()
             val json = Json.parseToJsonElement(data)
-            stuff.set(JsonData(json))
+            jsonData.set(JsonData(json))
         }.start()
     }
 
@@ -39,8 +40,27 @@ class NguhroutesClient : ClientModInitializer {
     override fun onInitializeClient() {
         registerCommand(ClientCommandManager.literal("snoop")
             .executes { context: CommandContext<FabricClientCommandSource?>? ->
-                context!!.getSource()!!.sendFeedback(Text.literal(stuff.get().routes.date))
+                context!!.getSource()!!.sendFeedback(Text.literal(jsonData.get()?.routes?.date))
                 1
             })
+        registerCommand(ClientCommandManager.literal("nr")
+            .then(ClientCommandManager.argument("dest", StringArgumentType.string())
+                .executes { context: CommandContext<FabricClientCommandSource?>? ->
+                    val dest = StringArgumentType.getString(context, "dest").uppercase()
+                    val jsonData = jsonData.get()
+                    if (jsonData == null) {
+                        context!!.getSource()!!.sendFeedback(Text.literal("Data has not loaded yet."))
+                        return@executes 1
+                    }
+                    val route = jsonData.routes.routes["MZS`${dest}"]
+                    if (route == null || route.isEmpty()) {
+                        context!!.getSource()!!.sendFeedback(Text.literal("Could not find route."))
+                        return@executes 1
+                    }
+                    for (stop in route) {
+                        context!!.getSource()!!.sendFeedback(Text.literal("${stop.station} (${stop.line})"))
+                    }
+                    1
+                }))
     }
 }
