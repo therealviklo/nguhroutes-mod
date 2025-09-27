@@ -10,8 +10,12 @@ import net.fabricmc.api.ClientModInitializer
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
+import net.minecraft.client.MinecraftClient
+import net.minecraft.client.world.ClientWorld
 import net.minecraft.command.CommandRegistryAccess
 import net.minecraft.text.Text
+import net.minecraft.util.Identifier
 import java.net.URI
 import java.util.concurrent.atomic.AtomicReference
 
@@ -19,6 +23,7 @@ import java.util.concurrent.atomic.AtomicReference
 class NguhroutesClient : ClientModInitializer {
     var jsonData: AtomicReference<JsonData?> = AtomicReference(null)
     var currRoute: Route? = null
+    var currStop = 0
 
     init {
         loadJson()
@@ -65,11 +70,39 @@ class NguhroutesClient : ClientModInitializer {
                         context!!.getSource()!!.sendFeedback(Text.literal("Could not find route."))
                         return@executes 1
                     }
+                    currStop = 0
                     currRoute = Route(start, route, jsonData.network)
                     for (stop in currRoute!!.stops) {
-                        context!!.getSource()!!.sendFeedback(Text.literal("${stop.code} (${stop.line}) (${stop.position})"))
+                        context!!.getSource()!!.sendFeedback(Text.literal("${stop.code} (${stop.line}) (${stop.coords})"))
                     }
                     1
                 }))
+        ClientTickEvents.END_WORLD_TICK.register { clientWorld -> tick(clientWorld) }
+    }
+
+    private fun tick(clientWorld: ClientWorld) {
+        val currRoute = currRoute ?: return
+        if (currStop >= currRoute.stops.size) {
+            this.currRoute = null
+            this.currStop = 0
+            return
+        }
+        val inst = MinecraftClient.getInstance()
+        val player = inst.player ?: return
+        val playerCoords = player.blockPos
+        if (distLess(playerCoords, currRoute.stops[currStop].coords, 50) &&
+            clientWorld.registryKey.value == Identifier.of(currRoute.stops[currStop].dimension) &&
+            (currStop == 0 || currRoute.stops[currStop].dimension != currRoute.stops[currStop - 1].dimension || distCloser(
+                playerCoords,
+                currRoute.stops[currStop].coords,
+                currRoute.stops[currStop - 1].coords))) {
+            currStop += 1
+            if (currStop < currRoute.stops.size) {
+                val nextStop = currRoute.stops[currStop]
+                val text = Text.of("Next: ${nextStop.code} (${nextStop.line})")
+                player.sendMessage(text, true)
+                player.sendMessage(text, false)
+            }
+        }
     }
 }
