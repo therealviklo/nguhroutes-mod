@@ -85,15 +85,18 @@ class NguhroutesClient : ClientModInitializer {
                         var fastestRouteStart: String? = null
                         var fastestRouteTime: Double = Double.POSITIVE_INFINITY
                         for (route in jsonData.routes.routes) {
+                            if (route.value.conns.isEmpty())
+                                continue
                             val routeCodes = route.key.split('`')
-                            if (routeCodes.getOrNull(1) == dest) {
+                            if (routeCodes.getOrNull(1) == dest &&
+                                context.source!!.player.clientWorld.registryKey.value == Identifier.of(getDim(routeCodes[0]))) {
                                 val firstStopCoords = if (route.value.conns[0].line == "Interdimensional transfer") {
                                     jsonData.network.findAverageStationCoords(routeCodes[0])
                                 } else {
                                     jsonData.network.getStop(routeCodes[0], route.value.conns[0].line).coords
                                 }
                                 // Add the time it takes to sprint to the stop
-                                val time = route.value.time + firstStopCoords.getSquaredDistance(playerPos) * (1 / 5.612)
+                                val time = route.value.time + sprintTime(playerPos, firstStopCoords)
                                 if (time < fastestRouteTime) {
                                     fastestRoute = route.value
                                     fastestRouteStart = routeCodes[0]
@@ -101,8 +104,15 @@ class NguhroutesClient : ClientModInitializer {
                                 }
                             }
                         }
+                        // Check if just sprinting there is faster
+                        val directTime = sprintTime(playerPos, jsonData.network.findAverageStationCoords(dest))
+                        if (directTime < fastestRouteTime) {
+                            fastestRoute = PreCalcRoute(0.0, listOf())
+                            fastestRouteStart = dest
+                            fastestRouteTime = directTime
+                        }
                         if (fastestRoute == null) {
-                            context!!.getSource()!!.sendFeedback(Text.literal("Could not find route."))
+                            context.getSource()!!.sendFeedback(Text.literal("Could not find route."))
 //                            return@Thread
                             return@executes 1
                         }
@@ -136,16 +146,22 @@ class NguhroutesClient : ClientModInitializer {
                 currRoute.stops[currStop - 1].coords))) {
             if (!this.currRoutePair.compareAndSet( currRoutePair, Pair(currRoute, currStop + 1)))
                 return
-            if (currStop < currRoute.stops.size) {
-                val nextStop = currRoute.stops[currStop]
+            if (currStop + 1 < currRoute.stops.size) {
+                val nextStop = currRoute.stops[currStop + 1]
                 sendNextStopMessage(nextStop)
+            } else {
+                sendRouteMessage("Route finished!")
             }
         }
     }
 
     private fun sendNextStopMessage(stop: RouteStop) {
+        sendRouteMessage("Next: ${stop.code} (${stop.line})")
+    }
+
+    private fun sendRouteMessage(msg: String) {
         val player = MinecraftClient.getInstance().player ?: return
-        val text = Text.of("Next: ${stop.code} (${stop.line})")
+        val text = Text.of(msg)
         player.sendMessage(text, true)
         player.sendMessage(text, false)
     }

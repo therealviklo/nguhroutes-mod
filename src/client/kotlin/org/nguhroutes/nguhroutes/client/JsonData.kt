@@ -52,7 +52,7 @@ class Routes(obj: JsonObject) {
 }
 
 data class Stop(val code: String, val coords: BlockPos)
-data class Line(val stops: List<Stop>)
+data class Line(val name: String, val stops: List<Stop>)
 
 class Network(obj: JsonObject) {
 //    val version: String = obj.getValue("version").jsonPrimitive.content
@@ -65,7 +65,8 @@ class Network(obj: JsonObject) {
         for (dimension in linesObj) {
             for (line in dimension.value.jsonArray) {
                 val lineObj = line.jsonObject
-                val lineName = lineObj.getValue("name").jsonPrimitive.content
+                val lineCode = lineObj.getValue("code").jsonPrimitive.content
+                val lineName = lineObj.get("name")?.jsonPrimitive?.content ?: lineCode
                 val stops = lineObj.getValue("stops").jsonArray
                 val stopsMut = mutableListOf<Stop>()
                 for (stop in stops) {
@@ -77,7 +78,7 @@ class Network(obj: JsonObject) {
                     val z = coords[2].jsonPrimitive.int
                     stopsMut.add(Stop(code, BlockPos(x, y, z)))
                 }
-                linesMut[lineName] = Line(stopsMut)
+                linesMut[lineCode] = Line(lineName, stopsMut)
             }
         }
         lines = linesMut

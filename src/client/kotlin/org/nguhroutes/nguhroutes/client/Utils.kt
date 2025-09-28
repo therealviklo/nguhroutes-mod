@@ -1,6 +1,7 @@
 package org.nguhroutes.nguhroutes.client
 
 import net.minecraft.util.math.BlockPos
+import net.minecraft.util.math.Vec3d
 
 /**
  * Returns true if the distance between a and b is less than dist
@@ -23,4 +24,18 @@ fun distCloser(p: BlockPos, a: BlockPos, b: BlockPos): Boolean {
     val dyb = p.y - b.y
     val dzb = p.z - b.z
     return dxa * dxa + dya * dya + dza * dza <= dxb * dxb + dyb * dyb + dzb * dzb
+}
+
+/**
+ * Calculates the time it takes to move in a straight line from pos to coords, given a speed expressed in seconds per block
+ */
+fun moveTime(pos: Vec3d, coords: BlockPos, secondsPerBlock: Double): Double {
+    return coords.getSquaredDistance(pos) * secondsPerBlock
+}
+
+/**
+ * Calculates the time it takes to sprint in a straight line from pos to coords
+ */
+fun sprintTime(pos: Vec3d, coords: BlockPos): Double {
+    return moveTime(pos, coords, 1 / 5.612)
 }

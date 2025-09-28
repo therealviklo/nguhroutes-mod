@@ -8,19 +8,20 @@ class Route(startCode: String, conns: List<Connection>, network: Network) {
     val stops: List<RouteStop>
 
     init {
-        if (conns.isEmpty())
-            throw IllegalArgumentException("Empty routes are not allowed")
-
         val stopsMut = mutableListOf<RouteStop>()
-
-        val startLine = conns[0].line
-        val startCoords: BlockPos = if (startLine == "Interdimensional transfer") {
-            // If it starts with an interdimensional transfer we need to determine the station location by
-            // averaging all coords
+        val startCoords: BlockPos = if (conns.isEmpty()) {
+            // This is the case for just running there
             network.findAverageStationCoords(startCode)
         } else {
-            // Otherwise we check the station's coords on the initial line
-            network.getStop(startCode, startLine).coords
+            val startLine = conns[0].line
+            if (startLine == "Interdimensional transfer") {
+                // If it starts with an interdimensional transfer we need to determine the station location by
+                // averaging all coords
+                network.findAverageStationCoords(startCode)
+            } else {
+                // Otherwise we check the station's coords on the initial line
+                network.getStop(startCode, startLine).coords
+            }
         }
         stopsMut.add(RouteStop(startCode, startCoords, getDim(startCode), "Start"))
 
