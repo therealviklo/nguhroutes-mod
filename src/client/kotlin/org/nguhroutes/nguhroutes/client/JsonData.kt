@@ -14,14 +14,15 @@ import kotlin.collections.getValue
 import kotlin.collections.iterator
 
 data class Connection(val station: String, val line: String)
+data class PreCalcRoute(val time: Double, val conns: List<Connection>)
 
 class Routes(obj: JsonObject) {
     val date: String = obj.getValue("date").jsonPrimitive.content
-    val routes: Map<String, List<Connection>>
+    val routes: Map<String, PreCalcRoute>
 
     init {
         val routesList = obj.getValue("routes").jsonObject
-        val routesMap = HashMap<String, List<Connection>>()
+        val routesMap = HashMap<String, PreCalcRoute>()
         for (i in routesList) {
             val tupleArr = i.value.jsonArray
             val time = tupleArr[0].jsonPrimitive.double
@@ -44,7 +45,7 @@ class Routes(obj: JsonObject) {
                     else -> throw RuntimeException("Route stop must be array or string")
                 }
             }
-            routesMap[i.key] = route
+            routesMap[i.key] = PreCalcRoute(time, route)
         }
         routes = routesMap
     }

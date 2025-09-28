@@ -21,10 +21,9 @@ import java.util.concurrent.atomic.AtomicReference
 
 
 class NguhroutesClient : ClientModInitializer {
-    var jsonData: AtomicReference<JsonData?> = AtomicReference(null)
-    var error: AtomicReference<String?> = AtomicReference(null)
-    var currRoute: Route? = null
-    var currStop = 0
+    val jsonData: AtomicReference<JsonData?> = AtomicReference(null)
+    val error: AtomicReference<String?> = AtomicReference(null)
+    val currRoutePair: AtomicReference<Pair<Route, Int>?> = AtomicReference(null)
 
     init {
         loadJson()
@@ -68,34 +67,63 @@ class NguhroutesClient : ClientModInitializer {
         registerCommand(ClientCommandManager.literal("nr")
             .then(ClientCommandManager.argument("dest", StringArgumentType.string())
                 .executes { context: CommandContext<FabricClientCommandSource?>? ->
-                    val start = "MZS"
                     val dest = StringArgumentType.getString(context, "dest").uppercase()
                     val jsonData = jsonData.get()
                     if (jsonData == null) {
                         context!!.getSource()!!.sendFeedback(Text.literal("Data has not loaded yet."))
                         return@executes 1
                     }
-                    val route = jsonData.routes.routes["$start`$dest"]
-                    if (route == null || route.isEmpty()) {
-                        context!!.getSource()!!.sendFeedback(Text.literal("Could not find route."))
-                        return@executes 1
-                    }
-                    currStop = 0
-                    currRoute = Route(start, route, jsonData.network)
-                    for (stop in currRoute!!.stops) {
-                        context!!.getSource()!!.sendFeedback(Text.literal("${stop.code} (${stop.line}) (${stop.coords})"))
-                    }
-                    sendNextStopMessage(currRoute!!.stops[0])
+//                    Thread {
+                        val playerPos = context?.source?.player?.pos
+                        if (playerPos == null) {
+                            context!!.getSource()!!.sendFeedback(Text.literal("Could not get player position."))
+//                            return@Thread
+                            return@executes 1
+                        }
+
+                        var fastestRoute: PreCalcRoute? = null
+                        var fastestRouteStart: String? = null
+                        var fastestRouteTime: Double = Double.POSITIVE_INFINITY
+                        for (route in jsonData.routes.routes) {
+                            val routeCodes = route.key.split('`')
+                            if (routeCodes.getOrNull(1) == dest) {
+                                val firstStopCoords = if (route.value.conns[0].line == "Interdimensional transfer") {
+                                    jsonData.network.findAverageStationCoords(routeCodes[0])
+                                } else {
+                                    jsonData.network.getStop(routeCodes[0], route.value.conns[0].line).coords
+                                }
+                                // Add the time it takes to sprint to the stop
+                                val time = route.value.time + firstStopCoords.getSquaredDistance(playerPos) * (1 / 5.612)
+                                if (time < fastestRouteTime) {
+                                    fastestRoute = route.value
+                                    fastestRouteStart = routeCodes[0]
+                                    fastestRouteTime = time
+                                }
+                            }
+                        }
+                        if (fastestRoute == null) {
+                            context!!.getSource()!!.sendFeedback(Text.literal("Could not find route."))
+//                            return@Thread
+                            return@executes 1
+                        }
+                        val routeObj = Route(fastestRouteStart!!, fastestRoute.conns, jsonData.network)
+                        currRoutePair.set(Pair(routeObj, 0))
+                        for (stop in routeObj.stops) {
+                            context!!.getSource()!!.sendFeedback(Text.literal("${stop.code} (${stop.line}) (${stop.coords})"))
+                        }
+                        sendNextStopMessage(routeObj.stops[0])
+//                    }.start()
                     1
                 }))
         ClientTickEvents.END_WORLD_TICK.register { clientWorld -> tick(clientWorld) }
     }
 
     private fun tick(clientWorld: ClientWorld) {
-        val currRoute = currRoute ?: return
+        val currRoutePair = currRoutePair.get() ?: return
+        val currRoute = currRoutePair.first
+        val currStop = currRoutePair.second
         if (currStop >= currRoute.stops.size) {
-            this.currRoute = null
-            currStop = 0
+            this.currRoutePair.compareAndSet(currRoutePair, null)
             return
         }
         val player = MinecraftClient.getInstance().player ?: return
@@ -106,7 +134,8 @@ class NguhroutesClient : ClientModInitializer {
                 playerCoords,
                 currRoute.stops[currStop].coords,
                 currRoute.stops[currStop - 1].coords))) {
-            currStop += 1
+            if (!this.currRoutePair.compareAndSet( currRoutePair, Pair(currRoute, currStop + 1)))
+                return
             if (currStop < currRoute.stops.size) {
                 val nextStop = currRoute.stops[currStop]
                 sendNextStopMessage(nextStop)
