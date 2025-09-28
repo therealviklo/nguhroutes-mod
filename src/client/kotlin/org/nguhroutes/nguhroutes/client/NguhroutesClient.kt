@@ -75,6 +75,7 @@ class NguhroutesClient : ClientModInitializer {
                     for (stop in currRoute!!.stops) {
                         context!!.getSource()!!.sendFeedback(Text.literal("${stop.code} (${stop.line}) (${stop.coords})"))
                     }
+                    sendNextStopMessage(currRoute!!.stops[0])
                     1
                 }))
         ClientTickEvents.END_WORLD_TICK.register { clientWorld -> tick(clientWorld) }
@@ -84,11 +85,10 @@ class NguhroutesClient : ClientModInitializer {
         val currRoute = currRoute ?: return
         if (currStop >= currRoute.stops.size) {
             this.currRoute = null
-            this.currStop = 0
+            currStop = 0
             return
         }
-        val inst = MinecraftClient.getInstance()
-        val player = inst.player ?: return
+        val player = MinecraftClient.getInstance().player ?: return
         val playerCoords = player.blockPos
         if (distLess(playerCoords, currRoute.stops[currStop].coords, 50) &&
             clientWorld.registryKey.value == Identifier.of(currRoute.stops[currStop].dimension) &&
@@ -99,10 +99,15 @@ class NguhroutesClient : ClientModInitializer {
             currStop += 1
             if (currStop < currRoute.stops.size) {
                 val nextStop = currRoute.stops[currStop]
-                val text = Text.of("Next: ${nextStop.code} (${nextStop.line})")
-                player.sendMessage(text, true)
-                player.sendMessage(text, false)
+                sendNextStopMessage(nextStop)
             }
         }
+    }
+
+    private fun sendNextStopMessage(stop: RouteStop) {
+        val player = MinecraftClient.getInstance().player ?: return
+        val text = Text.of("Next: ${stop.code} (${stop.line}) (Dimension: ${stop.dimension})")
+        player.sendMessage(text, true)
+        player.sendMessage(text, false)
     }
 }
