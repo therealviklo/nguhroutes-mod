@@ -73,12 +73,11 @@ class NguhroutesClient : ClientModInitializer {
                         context!!.getSource()!!.sendFeedback(Text.literal("Data has not loaded yet."))
                         return@executes 1
                     }
-//                    Thread {
+                    Thread {
                         val playerPos = context?.source?.player?.pos
                         if (playerPos == null) {
                             context!!.getSource()!!.sendFeedback(Text.literal("Could not get player position."))
-//                            return@Thread
-                            return@executes 1
+                            return@Thread
                         }
 
                         var fastestRoute: PreCalcRoute? = null
@@ -113,16 +112,15 @@ class NguhroutesClient : ClientModInitializer {
                         }
                         if (fastestRoute == null) {
                             context.getSource()!!.sendFeedback(Text.literal("Could not find route."))
-//                            return@Thread
-                            return@executes 1
+                            return@Thread
                         }
                         val routeObj = Route(fastestRouteStart!!, fastestRoute.conns, jsonData.network)
                         currRoutePair.set(Pair(routeObj, 0))
                         for (stop in routeObj.stops) {
-                            context!!.getSource()!!.sendFeedback(Text.literal("${stop.code} (${stop.line}) (${stop.coords})"))
+                            context.getSource()!!.sendFeedback(Text.literal("${stop.code} (${stop.lineName}) (${stop.coords})"))
                         }
                         sendNextStopMessage(routeObj.stops[0])
-//                    }.start()
+                    }.start()
                     1
                 }))
         ClientTickEvents.END_WORLD_TICK.register { clientWorld -> tick(clientWorld) }
@@ -156,7 +154,7 @@ class NguhroutesClient : ClientModInitializer {
     }
 
     private fun sendNextStopMessage(stop: RouteStop) {
-        sendRouteMessage("Next: ${stop.code} (${stop.line})")
+        sendRouteMessage("Next: ${stop.code} (${stop.lineName})")
     }
 
     private fun sendRouteMessage(msg: String) {

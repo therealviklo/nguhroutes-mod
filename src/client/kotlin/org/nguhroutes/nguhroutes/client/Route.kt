@@ -2,7 +2,7 @@ package org.nguhroutes.nguhroutes.client
 
 import net.minecraft.util.math.BlockPos
 
-data class RouteStop(val code: String, val coords: BlockPos, val dimension: String, val line: String)
+data class RouteStop(val code: String, val coords: BlockPos, val dimension: String, val lineCode: String?, val lineName: String)
 
 class Route(startCode: String, conns: List<Connection>, network: Network) {
     val stops: List<RouteStop>
@@ -23,7 +23,7 @@ class Route(startCode: String, conns: List<Connection>, network: Network) {
                 network.getStop(startCode, startLine).coords
             }
         }
-        stopsMut.add(RouteStop(startCode, startCoords, getDim(startCode), "Start"))
+        stopsMut.add(RouteStop(startCode, startCoords, getDim(startCode), null, "Start"))
 
         for (i in conns.indices) {
             val conn = conns[i]
@@ -45,7 +45,8 @@ class Route(startCode: String, conns: List<Connection>, network: Network) {
                 conn.station,
                 coords,
                 getDim(conn.station),
-                conn.line))
+                conn.line,
+                network.lines[conn.line]?.name ?: conn.line))
         }
         stops = stopsMut
     }
