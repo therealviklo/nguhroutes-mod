@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicReference
 
 class NguhroutesClient : ClientModInitializer {
     var jsonData: AtomicReference<JsonData?> = AtomicReference(null)
+    var error: AtomicReference<String?> = AtomicReference(null)
     var currRoute: Route? = null
     var currStop = 0
 
@@ -37,9 +38,13 @@ class NguhroutesClient : ClientModInitializer {
 
     fun loadJson() {
         Thread {
-            val routesJson = downloadJson("https://nguhroutes.viklo.workers.dev/json/routes.json")
-            val networkJson = downloadJson("https://nguhroutes.viklo.workers.dev/json/network.json")
-            jsonData.set(JsonData(routesJson, networkJson))
+            try {
+                val routesJson = downloadJson("https://nguhroutes.viklo.workers.dev/json/routes.json")
+                val networkJson = downloadJson("https://nguhroutes.viklo.workers.dev/json/network.json")
+                jsonData.set(JsonData(routesJson, networkJson))
+            } catch (e: Exception) {
+                error.set(e.toString())
+            }
         }.start()
     }
 
@@ -50,9 +55,14 @@ class NguhroutesClient : ClientModInitializer {
     }
 
     override fun onInitializeClient() {
-        registerCommand(ClientCommandManager.literal("snoop")
+        registerCommand(ClientCommandManager.literal("nr-error")
             .executes { context: CommandContext<FabricClientCommandSource?>? ->
-                context!!.getSource()!!.sendFeedback(Text.literal(jsonData.get()?.routes?.date))
+                val error = error.get()
+                if (error != null) {
+                    context!!.getSource()!!.sendFeedback(Text.literal(error))
+                } else {
+                    context!!.getSource()!!.sendFeedback(Text.literal("No errors."))
+                }
                 1
             })
         registerCommand(ClientCommandManager.literal("nr")
@@ -106,7 +116,7 @@ class NguhroutesClient : ClientModInitializer {
 
     private fun sendNextStopMessage(stop: RouteStop) {
         val player = MinecraftClient.getInstance().player ?: return
-        val text = Text.of("Next: ${stop.code} (${stop.line}) (Dimension: ${stop.dimension})")
+        val text = Text.of("Next: ${stop.code} (${stop.line})")
         player.sendMessage(text, true)
         player.sendMessage(text, false)
     }

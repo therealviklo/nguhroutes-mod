@@ -4,6 +4,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.double
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -22,7 +23,9 @@ class Routes(obj: JsonObject) {
         val routesList = obj.getValue("routes").jsonObject
         val routesMap = HashMap<String, List<Connection>>()
         for (i in routesList) {
-            val arr = i.value.jsonArray
+            val tupleArr = i.value.jsonArray
+            val time = tupleArr[0].jsonPrimitive.double
+            val arr = tupleArr[1].jsonArray
             var route = mutableListOf<Connection>()
             var currLine: String? = null
             for (j in arr) {
