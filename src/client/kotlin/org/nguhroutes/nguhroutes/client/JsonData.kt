@@ -13,10 +13,22 @@ import net.minecraft.util.math.BlockPos
 import kotlin.collections.getValue
 import kotlin.collections.iterator
 
+// Second number should only be increased if it is backwards compatible
+val supportedNetworkFormatVersion = "1.0"
+val supportedRoutesFormatVersion = "1.0"
+
 data class Connection(val station: String, val line: String)
 data class PreCalcRoute(val time: Double, val conns: List<Connection>)
 
 class Routes(obj: JsonObject) {
+    val format: String = obj.getValue("format").jsonPrimitive.content
+
+    init {
+        if (format.split('.')[0] != supportedRoutesFormatVersion.split('.')[0]) {
+            throw RuntimeException("Routes format ($format) is not supported ($supportedRoutesFormatVersion)")
+        }
+    }
+
     val date: String = obj.getValue("date").jsonPrimitive.content
     val routes: Map<String, PreCalcRoute>
 
@@ -55,6 +67,14 @@ data class Stop(val code: String, val coords: BlockPos)
 data class Line(val name: String, val stops: List<Stop>)
 
 class Network(obj: JsonObject) {
+    val format: String = obj.getValue("format").jsonPrimitive.content
+
+    init {
+        if (format.split('.')[0] != supportedNetworkFormatVersion.split('.')[0]) {
+            throw RuntimeException("Network format ($format) is not supported ($supportedNetworkFormatVersion)")
+        }
+    }
+
 //    val version: String = obj.getValue("version").jsonPrimitive.content
 //    val date: String = obj.getValue("date").jsonPrimitive.content
     val lines: Map<String, Line>
