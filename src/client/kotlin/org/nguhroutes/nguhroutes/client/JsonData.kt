@@ -14,8 +14,8 @@ import kotlin.collections.getValue
 import kotlin.collections.iterator
 
 // Second number should only be increased if it is backwards compatible
-val supportedNetworkFormatVersion = "1.0"
-val supportedRoutesFormatVersion = "1.0"
+const val supportedNetworkFormatVersion = "1.0"
+const val supportedRoutesFormatVersion = "1.0"
 
 data class Connection(val station: String, val line: String)
 data class PreCalcRoute(val time: Double, val conns: List<Connection>)
