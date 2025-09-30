@@ -10,3 +10,12 @@ fun getDim(code: String): String {
     }
     return "overworld"
 }
+
+fun getPrefix(code: String): String {
+    for (dim in prefixes) {
+        if (dim.value != "" && code.startsWith(dim.value)) {
+            return dim.value
+        }
+    }
+    return ""
+}

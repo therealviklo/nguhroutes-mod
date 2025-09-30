@@ -98,7 +98,15 @@ class NguhroutesClient : ClientModInitializer {
                         val dest = StringArgumentType.getString(context, "dest").uppercase()
                         setRoute(context, dest)
                         1
-                    }))
+                    })
+                .then(ClientCommandManager.argument("start", StringArgumentType.string())
+                    .then(ClientCommandManager.argument("dest", StringArgumentType.string())
+                        .executes { context ->
+                            val start = StringArgumentType.getString(context, "start").uppercase()
+                            val dest = StringArgumentType.getString(context, "dest").uppercase()
+                            setRouteWithStart(context, start, dest)
+                            1
+                        })))
             .then(ClientCommandManager.literal("restart")
                 .executes { context ->
                     val currRoutePair = currRoutePair.get()
@@ -128,6 +136,7 @@ class NguhroutesClient : ClientModInitializer {
                     if (currRoutePair == null) {
                         context.source.sendError(Text.literal("No active route"))
                     } else {
+                        context.source.sendFeedback(Text.literal("Active route:"))
                         for (i in currRoutePair.first.stops.indices) {
                             val stop = currRoutePair.first.stops[i];
                             val text = (if (i == currRoutePair.second) "> " else "") + "${stop.code} (${stop.lineName})";
@@ -135,7 +144,14 @@ class NguhroutesClient : ClientModInitializer {
                         }
                     }
                     1
-                }),
+                })
+            .then(ClientCommandManager.literal("stationlist")
+                .then(ClientCommandManager.argument("ngationcode", StringArgumentType.string())
+                    .executes { context ->
+                        val ngationcode = StringArgumentType.getString(context, "ngationcode").uppercase()
+                        stationList(context, ngationcode)
+                        1
+                    })),
             listOf("nr"))
         registerCommand(ClientCommandManager.literal("nrs")
             .then(ClientCommandManager.argument("dest", StringArgumentType.string())
@@ -143,8 +159,34 @@ class NguhroutesClient : ClientModInitializer {
                     val dest = StringArgumentType.getString(context, "dest").uppercase()
                     setRoute(context, dest)
                     1
-                }))
+                })
+            .then(ClientCommandManager.argument("start", StringArgumentType.string())
+                .then(ClientCommandManager.argument("dest", StringArgumentType.string())
+                    .executes { context ->
+                        val start = StringArgumentType.getString(context, "start").uppercase()
+                        val dest = StringArgumentType.getString(context, "dest").uppercase()
+                        setRouteWithStart(context, start, dest)
+                        1
+                    })))
         ClientTickEvents.END_WORLD_TICK.register { clientWorld -> tick(clientWorld) }
+    }
+
+    private fun setRouteWithStart(context: CommandContext<FabricClientCommandSource>, start: String, dest: String) {
+        val jsonData = jsonDataLoadError.get().first
+        if (jsonData == null) {
+            context.source.sendError(Text.literal("Data has not loaded yet."))
+            return
+        }
+
+        val route = jsonData.routes.routes["$start`$dest"]
+        if (route == null) {
+            context.source.sendError(Text.literal("Could not find route."))
+            return
+        }
+        val routeObj = Route(start, route.conns, jsonData.network)
+        currRoutePair.set(Pair(routeObj, 0))
+
+        sendNextStopMessage(routeObj.stops[0])
     }
 
     private fun setRoute(context: CommandContext<FabricClientCommandSource>, dest: String) {
@@ -237,6 +279,32 @@ class NguhroutesClient : ClientModInitializer {
             } else {
                 sendRouteMessage("Route finished!")
             }
+        }
+    }
+
+    private fun stationList(context: CommandContext<FabricClientCommandSource>, ngationCode: String) {
+        if (ngationCode.length != 2) {
+            context.source.sendError(Text.literal("This command currently only works with 2-letter codes."))
+            return
+        }
+        val jsonData = jsonDataLoadError.get().first
+        if (jsonData == null) {
+            context.source.sendError(Text.literal("Data has not loaded yet."))
+            return
+        }
+
+        context.source.sendFeedback(Text.literal("All stations in $ngationCode:"))
+        val stations = mutableSetOf<String>()
+        for (line in jsonData.network.lines) {
+            for (stop in line.value.stops) {
+                val code = stop.code
+                if (code.regionMatches(getPrefix(code).length, ngationCode, 0, 2)) {
+                    stations.add(code)
+                }
+            }
+        }
+        for (station in stations) {
+            context.source.sendFeedback(Text.literal(station))
         }
     }
 
