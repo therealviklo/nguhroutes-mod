@@ -16,10 +16,12 @@ import net.fabricmc.loader.api.FabricLoader
 import net.minecraft.client.MinecraftClient
 import net.minecraft.client.world.ClientWorld
 import net.minecraft.command.CommandRegistryAccess
+import net.minecraft.text.Style
 import net.minecraft.text.Text
 import net.minecraft.util.Identifier
 import java.net.URI
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.collections.getOrNull
 
 
 class NguhroutesClient : ClientModInitializer {
@@ -136,10 +138,12 @@ class NguhroutesClient : ClientModInitializer {
                     if (currRoutePair == null) {
                         context.source.sendError(Text.literal("No active route"))
                     } else {
+                        val jsonData = getJsonData(context) ?: return@executes 1
                         context.source.sendFeedback(Text.literal("Active route:"))
                         for (i in currRoutePair.first.stops.indices) {
                             val stop = currRoutePair.first.stops[i];
-                            val text = (if (i == currRoutePair.second) "> " else "") + "${stop.code} (${stop.lineName})";
+                            val name = jsonData.network.stationNames[stop.code]?.getOrNull(0) ?: stop.code
+                            val text = (if (i == currRoutePair.second) "> " else "") + "$name (${stop.code}, ${stop.lineName})";
                             context.source.sendFeedback(Text.literal(text))
                         }
                     }
@@ -164,7 +168,45 @@ class NguhroutesClient : ClientModInitializer {
                     val selectedStation = stations.random()
                     setRoute(context, selectedStation)
                     1
-                }),
+                })
+            .then(ClientCommandManager.literal("search")
+                .then(ClientCommandManager.argument("regex", StringArgumentType.greedyString())
+                    .executes { context ->
+                        val query = StringArgumentType.getString(context, "regex")
+                        val jsonData = getJsonData(context) ?: return@executes 1
+                        Thread {
+                            val finds = mutableListOf<Text>()
+                            for (station in jsonData.network.stationNames) {
+                                val re = Regex(query, RegexOption.IGNORE_CASE)
+                                var longestNameFind: Text? = null
+                                var longestNameLength = 0
+                                for (name in station.value) {
+                                    if (longestNameFind != null && longestNameLength >= name.length)
+                                        continue
+                                    val match = re.find(name)
+                                    if (match != null) {
+                                        val text = Text.literal(name.take(match.range.first))
+                                        Text.of(name.substring(match.range))
+                                            .getWithStyle(Style.EMPTY.withUnderline(true)).map { i -> text.append(i) }
+                                        text.append(Text.of(name.substring((match.range.last + 1)) + " (${station.key})"))
+                                        longestNameFind = text
+                                        longestNameLength = name.length
+                                    }
+                                }
+                                if (longestNameFind != null)
+                                    finds.add(longestNameFind)
+                            }
+                            if (finds.isEmpty()) {
+                                context.source.sendFeedback(Text.of("No search results."))
+                            } else {
+                                context.source.sendFeedback(Text.of("Search Results:"))
+                                for (result in finds) {
+                                    context.source.sendFeedback(result)
+                                }
+                            }
+                        }.start()
+                        1
+                    })),
             listOf("nr"))
         registerCommand(ClientCommandManager.literal("nrs")
             .then(ClientCommandManager.argument("dest", StringArgumentType.string())
@@ -195,7 +237,7 @@ class NguhroutesClient : ClientModInitializer {
         val routeObj = Route(start, route.conns, jsonData.network)
         currRoutePair.set(Pair(routeObj, 0))
 
-        sendNextStopMessage(routeObj.stops[0])
+        sendNextStopMessage(routeObj.stops[0], context)
     }
 
     private fun setRoute(context: CommandContext<FabricClientCommandSource>, dest: String) {
@@ -236,7 +278,13 @@ class NguhroutesClient : ClientModInitializer {
             }
 
             if (!stationHasBeenSeen) {
-                context.source.sendError(Text.literal("Could not find station \"${dest}\"."))
+                if (jsonData.network.stationNames.containsKey(dest)) {
+                    // This is the case for where a station is in the "stations" property in network.jsonc,
+                    // but is not actually anywhere in the network.
+                    context.source.sendError(Text.literal("Could not find route to station \"${dest}\"."))
+                } else {
+                    context.source.sendError(Text.literal("Could not find station \"${dest}\"."))
+                }
                 return@Thread
             }
 
@@ -256,7 +304,7 @@ class NguhroutesClient : ClientModInitializer {
             val routeObj = Route(fastestRouteStart!!, fastestRoute.conns, jsonData.network)
             currRoutePair.set(Pair(routeObj, 0))
 
-            sendNextStopMessage(routeObj.stops[0])
+            sendNextStopMessage(routeObj.stops[0], context)
         }.start()
     }
 
@@ -305,12 +353,15 @@ class NguhroutesClient : ClientModInitializer {
             }
         }
         for (station in stations) {
-            context.source.sendFeedback(Text.literal(station))
+            val name = jsonData.network.stationNames[station]?.getOrNull(0) ?: station
+            context.source.sendFeedback(Text.literal("$name ($station)"))
         }
     }
 
-    private fun sendNextStopMessage(stop: RouteStop) {
-        sendRouteMessage("Next: ${stop.code} (${stop.lineName})")
+    private fun sendNextStopMessage(stop: RouteStop, context: CommandContext<FabricClientCommandSource>? = null) {
+        val jsonData = getJsonData(context) ?: return
+        val name = jsonData.network.stationNames[stop.code]?.getOrNull(0) ?: stop.code
+        sendRouteMessage("Next: ${name} (${stop.code}, ${stop.lineName})")
     }
 
     private fun sendRouteMessage(msg: String) {
@@ -323,10 +374,16 @@ class NguhroutesClient : ClientModInitializer {
     /**
      * Gets the JsonData and prints a message if it does not exist.
      */
-    private fun getJsonData(context: CommandContext<FabricClientCommandSource>): JsonData? {
+    private fun getJsonData(context: CommandContext<FabricClientCommandSource>? = null): JsonData? {
         val jsonData = jsonDataLoadError.get().first
         if (jsonData == null) {
-            context.source.sendFeedback(Text.of("Data has not loaded yet."))
+            val text = Text.of("Data has not loaded yet.")
+            if (context != null) {
+                context.source.sendError(text)
+            } else {
+                val player = MinecraftClient.getInstance().player ?: return null
+                player.sendMessage(text, false)
+            }
             return null
         }
         return jsonData

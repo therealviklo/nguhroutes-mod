@@ -14,7 +14,7 @@ import kotlin.collections.getValue
 import kotlin.collections.iterator
 
 // Second number should only be increased if it is backwards compatible
-const val supportedNetworkFormatVersion = "1.0"
+const val supportedNetworkFormatVersion = "1.1"
 const val supportedRoutesFormatVersion = "1.0"
 
 data class Connection(val station: String, val line: String)
@@ -78,6 +78,7 @@ class Network(obj: JsonObject) {
 //    val version: String = obj.getValue("version").jsonPrimitive.content
 //    val date: String = obj.getValue("date").jsonPrimitive.content
     val lines: Map<String, Line>
+    val stationNames: Map<String, List<String>>
 
     init {
         val linesObj = obj.getValue("lines").jsonObject
@@ -102,6 +103,43 @@ class Network(obj: JsonObject) {
             }
         }
         lines = linesMut
+
+        val stationNamesMut = mutableMapOf<String, List<String>>()
+        val stationsObj = obj.get("stations")
+        if (stationsObj != null) {
+            for (station in stationsObj.jsonObject) {
+                val nameList = mutableListOf<String>()
+                when (val names = station.value) {
+                    is JsonArray -> {
+                        for (name in names) {
+                            nameList.add(name.jsonPrimitive.content)
+                        }
+                    }
+                    is JsonPrimitive -> {
+                        val name = names.content
+                        if (name.startsWith('$')) {
+                            val referee = name.substring(1)
+                            when (val names = stationsObj.jsonObject[referee]) {
+                                is JsonArray -> {
+                                    for (name in names) {
+                                        nameList.add(name.jsonPrimitive.content)
+                                    }
+                                }
+                                is JsonPrimitive -> {
+                                    nameList.add(names.content)
+                                }
+                                else -> throw RuntimeException("Station ${station.key} points to ${referee}, which has a name that is neither a string nor an array")
+                            }
+                        } else {
+                            nameList.add(name)
+                        }
+                    }
+                    else -> throw RuntimeException("Station ${station.key} has a name that is neither a string nor an array")
+                }
+                stationNamesMut[station.key] = nameList
+            }
+        }
+        stationNames = stationNamesMut
     }
 
     fun getStop(code: String, line: String): Stop {
@@ -126,7 +164,7 @@ class Network(obj: JsonObject) {
             }
         }
         if (n == 0L)
-            throw IllegalArgumentException("Station does not exist")
+            throw IllegalArgumentException("Station $code does not exist")
         return BlockPos((x / n).toInt(), (y / n).toInt(), (z / n).toInt())
     }
 }
