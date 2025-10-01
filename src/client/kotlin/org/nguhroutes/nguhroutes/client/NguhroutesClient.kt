@@ -151,7 +151,20 @@ class NguhroutesClient : ClientModInitializer {
                         val ngationcode = StringArgumentType.getString(context, "ngationcode").uppercase()
                         stationList(context, ngationcode)
                         1
-                    })),
+                    }))
+            .then(ClientCommandManager.literal("random")
+                .executes { context ->
+                    val jsonData = getJsonData(context) ?: return@executes 1
+                    val stations = mutableSetOf<String>()
+                    for (line in jsonData.network.lines) {
+                        for (stop in line.value.stops) {
+                            stations.add(stop.code)
+                        }
+                    }
+                    val selectedStation = stations.random()
+                    setRoute(context, selectedStation)
+                    1
+                }),
             listOf("nr"))
         registerCommand(ClientCommandManager.literal("nrs")
             .then(ClientCommandManager.argument("dest", StringArgumentType.string())
@@ -172,11 +185,7 @@ class NguhroutesClient : ClientModInitializer {
     }
 
     private fun setRouteWithStart(context: CommandContext<FabricClientCommandSource>, start: String, dest: String) {
-        val jsonData = jsonDataLoadError.get().first
-        if (jsonData == null) {
-            context.source.sendError(Text.literal("Data has not loaded yet."))
-            return
-        }
+        val jsonData = getJsonData(context) ?: return
 
         val route = jsonData.routes.routes["$start`$dest"]
         if (route == null) {
@@ -190,11 +199,7 @@ class NguhroutesClient : ClientModInitializer {
     }
 
     private fun setRoute(context: CommandContext<FabricClientCommandSource>, dest: String) {
-        val jsonData = jsonDataLoadError.get().first
-        if (jsonData == null) {
-            context.source.sendError(Text.literal("Data has not loaded yet."))
-            return
-        }
+        val jsonData = getJsonData(context) ?: return
         Thread {
             val playerPos = context.source?.player?.pos
             if (playerPos == null) {
@@ -287,11 +292,7 @@ class NguhroutesClient : ClientModInitializer {
             context.source.sendError(Text.literal("This command currently only works with 2-letter codes."))
             return
         }
-        val jsonData = jsonDataLoadError.get().first
-        if (jsonData == null) {
-            context.source.sendError(Text.literal("Data has not loaded yet."))
-            return
-        }
+        val jsonData = getJsonData(context) ?: return
 
         context.source.sendFeedback(Text.literal("All stations in $ngationCode:"))
         val stations = mutableSetOf<String>()
@@ -317,5 +318,17 @@ class NguhroutesClient : ClientModInitializer {
         val text = Text.of(msg)
         player.sendMessage(text, true)
         player.sendMessage(text, false)
+    }
+
+    /**
+     * Gets the JsonData and prints a message if it does not exist.
+     */
+    private fun getJsonData(context: CommandContext<FabricClientCommandSource>): JsonData? {
+        val jsonData = jsonDataLoadError.get().first
+        if (jsonData == null) {
+            context.source.sendFeedback(Text.of("Data has not loaded yet."))
+            return null
+        }
+        return jsonData
     }
 }
