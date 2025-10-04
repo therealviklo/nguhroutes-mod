@@ -48,7 +48,7 @@ class NguhroutesClient : ClientModInitializer {
             try {
                 val networkJson = downloadJson("https://nguhroutes.viklo.workers.dev/json/network.json")
                 val network = Network(networkJson.jsonObject)
-                val preCalcRoutes = PreCalcRoutes(network)
+                val preCalcRoutes = PreCalcRoutes(network, noNether)
                 nrDataLoadError.compareAndSet(nullPair, Pair(NRData(network, preCalcRoutes), null))
             } catch (e: Exception) {
                 nrDataLoadError.compareAndSet(nullPair, Pair(null, e.toString()))
@@ -124,10 +124,13 @@ class NguhroutesClient : ClientModInitializer {
                     1
                 })
             .then(ClientCommandManager.literal("reload")
-                .then(ClientCommandManager.argument("noNether", BoolArgumentType.bool())
+                .executes { context ->
+                    loadJson(false)
+                    1
+                }
+                .then(ClientCommandManager.literal("nonether")
                     .executes { context ->
-                        val noNether = BoolArgumentType.getBool(context, "noNether")
-                        loadJson(noNether)
+                        loadJson(true)
                         1
                     }))
             .then(ClientCommandManager.literal("route")

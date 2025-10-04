@@ -28,7 +28,7 @@ class PreCalcRoutes {
     /**
      * Generate pre-calculated routes from a Network.
      */
-    constructor(net: Network) {
+    constructor(net: Network, noNether: Boolean) {
         val routesMut = HashMap<Pair<String, String>, PreCalcRoute>()
 
         // First, extract lists of which connections exist at each station
@@ -75,6 +75,25 @@ class PreCalcRoutes {
             }
             if (line.value.loop && prevStop != null && firstStop != null) {
                 addConnections(prevStop, firstStop)
+            }
+        }
+
+        // Add Nether connections if applicable
+        if (!noNether) {
+            for (connection in net.connections) {
+                addStationIfNecessary(connection.first)
+                addStationIfNecessary(connection.second)
+                fun addConnection(from: String, to: String) {
+                    stations.getValue(from).conns.add(CostConnection(Connection(
+                        to,
+                        "Interdimensional transfer"),
+                        // This is the time that you have to stand in a portal, but it would be better to approximate
+                        // the time it takes to get to the portal
+                        4.0
+                    ))
+                }
+                addConnection(connection.first, connection.second)
+                addConnection(connection.second, connection.first)
             }
         }
 
@@ -131,6 +150,7 @@ class PreCalcRoutes {
         routes = routesMut
     }
 
+    // Currently this is no longer used but it's probably good to keep around in case we want to do caching.
     /**
      * Load pre-calculated routes from JSON.
      */

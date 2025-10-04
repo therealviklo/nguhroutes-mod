@@ -4,7 +4,6 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.boolean
-import kotlinx.serialization.json.double
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
@@ -18,7 +17,7 @@ const val supportedNetworkFormatVersion = "1.1"
 data class Stop(val code: String, val coords: BlockPos, val time: Double? = null, val dist: Double? = null)
 data class Line(val name: String, val stops: List<Stop>, val loop: Boolean)
 
-class Network(obj: JsonObject, noNether: Boolean) {
+class Network(obj: JsonObject) {
     val format: String = obj.getValue("format").jsonPrimitive.content
 
     init {
@@ -27,9 +26,10 @@ class Network(obj: JsonObject, noNether: Boolean) {
         }
     }
 
-    //    val version: String = obj.getValue("version").jsonPrimitive.content
+//    val version: String = obj.getValue("version").jsonPrimitive.content
 //    val date: String = obj.getValue("date").jsonPrimitive.content
     val lines: Map<String, Line>
+    val connections: List<Pair<String, String>>
     val stationNames: Map<String, List<String>>
 
     init {
@@ -39,7 +39,7 @@ class Network(obj: JsonObject, noNether: Boolean) {
             for (line in dimension.value.jsonArray) {
                 val lineObj = line.jsonObject
                 val lineCode = lineObj.getValue("code").jsonPrimitive.content
-                val lineName = lineObj.get("name")?.jsonPrimitive?.content ?: lineCode
+                val lineName = lineObj["name"]?.jsonPrimitive?.content ?: lineCode
                 val stops = lineObj.getValue("stops").jsonArray
                 val stopsMut = mutableListOf<Stop>()
                 for (stop in stops) {
@@ -60,6 +60,26 @@ class Network(obj: JsonObject, noNether: Boolean) {
             }
         }
         lines = linesMut
+
+        val connectionsMut = mutableListOf<Pair<String, String>>()
+        val connectionsObject = obj["connections"]
+        if (connectionsObject != null) {
+            for (connection in connectionsObject.jsonArray) {
+                when (connection) {
+                    is JsonArray -> {
+                        val overworldCode = connection[0].jsonPrimitive.content
+                        val netherCode = prefixes["the_nether"] + connection[1].jsonPrimitive.content
+                        connectionsMut.add(Pair(overworldCode, netherCode))
+                    }
+                    is JsonPrimitive -> {
+                        val code = connection.content
+                        connectionsMut.add(Pair(code, prefixes["the_nether"] + code))
+                    }
+                    else -> throw RuntimeException("There is a connection is nether a string nor an array")
+                }
+            }
+        }
+        connections = connectionsMut
 
         val stationNamesMut = mutableMapOf<String, List<String>>()
         val stationsObj = obj.get("stations")
