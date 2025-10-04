@@ -7,6 +7,7 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder
 import com.mojang.brigadier.context.CommandContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.jsonObject
 import net.fabricmc.api.ClientModInitializer
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback
@@ -26,7 +27,7 @@ import kotlin.collections.getOrNull
 
 class NguhroutesClient : ClientModInitializer {
     // TODO: nicer way of doing this?
-    val jsonDataLoadError: AtomicReference<Pair<JsonData?, String?>> = AtomicReference(Pair(null, null))
+    val nrDataLoadError: AtomicReference<Pair<NRData?, String?>> = AtomicReference(Pair(null, null))
     val currRoutePair: AtomicReference<Pair<Route, Int>?> = AtomicReference(null)
 
     init {
@@ -41,19 +42,16 @@ class NguhroutesClient : ClientModInitializer {
 
     fun loadJson(noNether: Boolean) {
         val nullPair = Pair(null, null)
-        jsonDataLoadError.set(nullPair)
+        nrDataLoadError.set(nullPair)
         currRoutePair.set(null)
         Thread {
             try {
-                val routesJson = if (noNether) {
-                    downloadJson("https://nguhroutes.viklo.workers.dev/json/routes_no_nether.json")
-                } else {
-                    downloadJson("https://nguhroutes.viklo.workers.dev/json/routes.json")
-                }
                 val networkJson = downloadJson("https://nguhroutes.viklo.workers.dev/json/network.json")
-                jsonDataLoadError.compareAndSet(nullPair, Pair(JsonData(routesJson, networkJson), null))
+                val network = Network(networkJson.jsonObject)
+                val preCalcRoutes = PreCalcRoutes(network)
+                nrDataLoadError.compareAndSet(nullPair, Pair(NRData(network, preCalcRoutes), null))
             } catch (e: Exception) {
-                jsonDataLoadError.compareAndSet(nullPair, Pair(null, e.toString()))
+                nrDataLoadError.compareAndSet(nullPair, Pair(null, e.toString()))
             }
         }.start()
     }
@@ -78,7 +76,7 @@ class NguhroutesClient : ClientModInitializer {
                     val container = FabricLoader.getInstance().getModContainer("nguhroutes").orElse(null)
                     val version = container?.metadata?.version?.friendlyString ?: "(unknown version)"
                     context.source.sendFeedback(Text.literal("Nguhroutes v$version"))
-                    val jsonDataLoadError = this@NguhroutesClient.jsonDataLoadError.get()
+                    val jsonDataLoadError = this@NguhroutesClient.nrDataLoadError.get()
                     val jsonData = jsonDataLoadError.first
                     val loadError = jsonDataLoadError.second
                     if (jsonData!= null) {
@@ -229,7 +227,7 @@ class NguhroutesClient : ClientModInitializer {
     private fun setRouteWithStart(context: CommandContext<FabricClientCommandSource>, start: String, dest: String) {
         val jsonData = getJsonData(context) ?: return
 
-        val route = jsonData.routes.routes["$start`$dest"]
+        val route = jsonData.preCalcRoutes.routes[Pair(start, dest)]
         if (route == null) {
             context.source.sendError(Text.literal("Could not find route."))
             return
@@ -254,23 +252,22 @@ class NguhroutesClient : ClientModInitializer {
             var fastestRouteStart: String? = null
             var fastestRouteTime: Double = Double.POSITIVE_INFINITY
             var stationHasBeenSeen = false
-            for (route in jsonData.routes.routes) {
+            for (route in jsonData.preCalcRoutes.routes) {
                 if (route.value.conns.isEmpty())
                     continue
-                val routeCodes = route.key.split('`')
-                if (routeCodes.getOrNull(1) == dest) {
+                if (route.key.second == dest) {
                     stationHasBeenSeen = true
-                    if (context.source!!.player.clientWorld.registryKey.value == Identifier.of(getDim(routeCodes[0]))) {
+                    if (context.source!!.player.clientWorld.registryKey.value == Identifier.of(getDim(route.key.first))) {
                         val firstStopCoords = if (route.value.conns[0].line == "Interdimensional transfer") {
-                            jsonData.network.findAverageStationCoords(routeCodes[0])
+                            jsonData.network.findAverageStationCoords(route.key.first)
                         } else {
-                            jsonData.network.getStop(routeCodes[0], route.value.conns[0].line).coords
+                            jsonData.network.getStop(route.key.first, route.value.conns[0].line).coords
                         }
                         // Add the time it takes to sprint to the stop
                         val time = route.value.time + sprintTime(playerPos, firstStopCoords)
                         if (time < fastestRouteTime) {
                             fastestRoute = route.value
-                            fastestRouteStart = routeCodes[0]
+                            fastestRouteStart = route.key.first
                             fastestRouteTime = time
                         }
                     }
@@ -374,8 +371,8 @@ class NguhroutesClient : ClientModInitializer {
     /**
      * Gets the JsonData and prints a message if it does not exist.
      */
-    private fun getJsonData(context: CommandContext<FabricClientCommandSource>? = null): JsonData? {
-        val jsonData = jsonDataLoadError.get().first
+    private fun getJsonData(context: CommandContext<FabricClientCommandSource>? = null): NRData? {
+        val jsonData = nrDataLoadError.get().first
         if (jsonData == null) {
             val text = Text.of("Data has not loaded yet.")
             if (context != null) {

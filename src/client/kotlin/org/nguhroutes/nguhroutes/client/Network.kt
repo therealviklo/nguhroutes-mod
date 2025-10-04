@@ -1,72 +1,24 @@
 package org.nguhroutes.nguhroutes.client
 
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.double
+import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import net.minecraft.util.math.BlockPos
-import kotlin.collections.getValue
 import kotlin.collections.iterator
 
-// Second number should only be increased if it is backwards compatible
 const val supportedNetworkFormatVersion = "1.1"
-const val supportedRoutesFormatVersion = "1.0"
 
-data class Connection(val station: String, val line: String)
-data class PreCalcRoute(val time: Double, val conns: List<Connection>)
+data class Stop(val code: String, val coords: BlockPos, val time: Double? = null, val dist: Double? = null)
+data class Line(val name: String, val stops: List<Stop>, val loop: Boolean)
 
-class Routes(obj: JsonObject) {
-    val format: String = obj.getValue("format").jsonPrimitive.content
-
-    init {
-        if (format.split('.')[0] != supportedRoutesFormatVersion.split('.')[0]) {
-            throw RuntimeException("Routes format ($format) is not supported ($supportedRoutesFormatVersion)")
-        }
-    }
-
-    val date: String = obj.getValue("date").jsonPrimitive.content
-    val routes: Map<String, PreCalcRoute>
-
-    init {
-        val routesList = obj.getValue("routes").jsonObject
-        val routesMap = HashMap<String, PreCalcRoute>()
-        for (i in routesList) {
-            val tupleArr = i.value.jsonArray
-            val time = tupleArr[0].jsonPrimitive.double
-            val arr = tupleArr[1].jsonArray
-            var route = mutableListOf<Connection>()
-            var currLine: String? = null
-            for (j in arr) {
-                when (j) {
-                    is JsonArray -> {
-                        val code = j[0].jsonPrimitive.content
-                        val line = j[1].jsonPrimitive.content
-                        route.add(Connection(code, line))
-                        currLine = line
-                    }
-                    is JsonPrimitive -> {
-                        if (currLine == null)
-                            throw RuntimeException("Line was not specified for route stop")
-                        route.add(Connection(j.content, currLine))
-                    }
-                    else -> throw RuntimeException("Route stop must be array or string")
-                }
-            }
-            routesMap[i.key] = PreCalcRoute(time, route)
-        }
-        routes = routesMap
-    }
-}
-
-data class Stop(val code: String, val coords: BlockPos)
-data class Line(val name: String, val stops: List<Stop>)
-
-class Network(obj: JsonObject) {
+class Network(obj: JsonObject, noNether: Boolean) {
     val format: String = obj.getValue("format").jsonPrimitive.content
 
     init {
@@ -75,7 +27,7 @@ class Network(obj: JsonObject) {
         }
     }
 
-//    val version: String = obj.getValue("version").jsonPrimitive.content
+    //    val version: String = obj.getValue("version").jsonPrimitive.content
 //    val date: String = obj.getValue("date").jsonPrimitive.content
     val lines: Map<String, Line>
     val stationNames: Map<String, List<String>>
@@ -97,9 +49,14 @@ class Network(obj: JsonObject) {
                     val x = coords[0].jsonPrimitive.int
                     val y = coords[1].jsonPrimitive.int
                     val z = coords[2].jsonPrimitive.int
-                    stopsMut.add(Stop(code, BlockPos(x, y, z)))
+                    stopsMut.add(Stop(
+                        code,
+                        BlockPos(x, y, z),
+                        stopObj["time"]?.jsonPrimitive?.doubleOrNull,
+                        stopObj["dist"]?.jsonPrimitive?.doubleOrNull
+                    ))
                 }
-                linesMut[lineCode] = Line(lineName, stopsMut)
+                linesMut[lineCode] = Line(lineName, stopsMut, lineObj["loop"]?.jsonPrimitive?.boolean ?: false)
             }
         }
         lines = linesMut
@@ -167,9 +124,4 @@ class Network(obj: JsonObject) {
             throw IllegalArgumentException("Station $code does not exist")
         return BlockPos((x / n).toInt(), (y / n).toInt(), (z / n).toInt())
     }
-}
-
-class JsonData(routesJson: JsonElement, networkJson: JsonElement) {
-    val routes = Routes(routesJson.jsonObject)
-    val network = Network(networkJson.jsonObject)
 }
