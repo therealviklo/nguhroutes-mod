@@ -138,7 +138,7 @@ class Network(obj: JsonObject) {
             ?: throw IllegalArgumentException("Unable to find stop $code on $line")
     }
 
-    fun findAverageStationCoords(code: String): BlockPos {
+    fun findAverageStationCoords(code: String): BlockPos? {
         var x: Long = 0
         var y: Long = 0
         var z: Long = 0
@@ -156,7 +156,12 @@ class Network(obj: JsonObject) {
             }
         }
         if (n == 0L)
-            throw IllegalArgumentException("Station $code does not exist")
+            return null
         return BlockPos((x / n).toInt(), (y / n).toInt(), (z / n).toInt())
+    }
+
+    fun findAverageStationCoordsThrowing(code: String): BlockPos {
+        return findAverageStationCoords(code)
+            ?: throw RuntimeException("Cannot find coordinates for $code")
     }
 }

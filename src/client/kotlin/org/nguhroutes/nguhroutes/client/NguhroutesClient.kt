@@ -46,7 +46,7 @@ class NguhroutesClient : ClientModInitializer {
         return Json.parseToJsonElement(data)
     }
 
-    fun loadJson(noNether: Boolean) {
+    fun loadJson(noNether: Boolean, feedback: ClientPlayerEntity? = null) {
         val nullPair = Pair(null, null)
         nrDataLoadError.set(nullPair)
         currRoutePair.set(null)
@@ -56,8 +56,11 @@ class NguhroutesClient : ClientModInitializer {
                 val network = Network(networkJson.jsonObject)
                 val preCalcRoutes = PreCalcRoutes(network, noNether)
                 nrDataLoadError.compareAndSet(nullPair, Pair(NRData(network, preCalcRoutes), null))
+                feedback?.sendMessage(Text.of("Finished loading NguhRoutes data!"), false)
             } catch (e: Exception) {
                 nrDataLoadError.compareAndSet(nullPair, Pair(null, e.toString()))
+                if (feedback != null)
+                    sendError(Text.of("Error when loading NguhRoutes data: ${e.toString()}"))
             }
         }.start()
     }
@@ -82,7 +85,7 @@ class NguhroutesClient : ClientModInitializer {
                 .executes { context ->
                     val container = FabricLoader.getInstance().getModContainer("nguhroutes").orElse(null)
                     val version = container?.metadata?.version?.friendlyString ?: "(unknown version)"
-                    context.source.sendFeedback(Text.literal("Nguhroutes v$version"))
+                    context.source.sendFeedback(Text.literal("NguhRoutes v$version"))
                     val jsonDataLoadError = this@NguhroutesClient.nrDataLoadError.get()
                     val jsonData = jsonDataLoadError.first
                     val loadError = jsonDataLoadError.second
@@ -132,7 +135,7 @@ class NguhroutesClient : ClientModInitializer {
                 })
             .then(ClientCommandManager.literal("reload")
                 .executes { context ->
-                    loadJson(false)
+                    loadJson(false, context.source.player)
                     1
                 }
                 .then(ClientCommandManager.literal("nonether")
@@ -356,6 +359,12 @@ class NguhroutesClient : ClientModInitializer {
                         } else {
                             jsonData.network.getStop(route.key.first, route.value.conns[0].line).coords
                         }
+
+                        // If we can't determine the coords for the initial stop we can't use that route
+                        if (firstStopCoords == null) {
+                            continue
+                        }
+
                         // Add the time it takes to sprint to the stop
                         val time = route.value.time + sprintTime(playerPos, firstStopCoords)
                         if (time < fastestRouteTime) {
@@ -378,12 +387,17 @@ class NguhroutesClient : ClientModInitializer {
                 return@Thread
             }
 
-            // Check if just sprinting there is faster
-            val directTime = sprintTime(playerPos, jsonData.network.findAverageStationCoords(dest))
-            if (directTime < fastestRouteTime) {
-                fastestRoute = PreCalcRoute(0.0, listOf())
-                fastestRouteStart = dest
-                fastestRouteTime = directTime
+            if (context.source!!.player.clientWorld.registryKey.value == Identifier.of(getDim(dest))) {
+                // Check if just sprinting there is faster
+                val coords = jsonData.network.findAverageStationCoords(dest)
+                if (coords != null) {
+                    val directTime = sprintTime(playerPos, coords)
+                    if (directTime < fastestRouteTime) {
+                        fastestRoute = PreCalcRoute(0.0, listOf())
+                        fastestRouteStart = dest
+                        fastestRouteTime = directTime
+                    }
+                }
             }
 
             if (fastestRoute == null) {
@@ -522,7 +536,7 @@ class NguhroutesClient : ClientModInitializer {
         return jsonData
     }
 
-    private fun sendError(text: Text, context: CommandContext<FabricClientCommandSource>?) {
+    private fun sendError(text: Text, context: CommandContext<FabricClientCommandSource>? = null) {
         if (context != null) {
             context.source.sendError(text)
         } else {

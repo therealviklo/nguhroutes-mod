@@ -11,13 +11,13 @@ class Route(startCode: String, conns: List<Connection>, network: Network) {
         val stopsMut = mutableListOf<RouteStop>()
         val startCoords: BlockPos = if (conns.isEmpty()) {
             // This is the case for just running there
-            network.findAverageStationCoords(startCode)
+            network.findAverageStationCoordsThrowing(startCode)
         } else {
             val startLine = conns[0].line
             if (startLine == "Interdimensional transfer") {
                 // If it starts with an interdimensional transfer we need to determine the station location by
                 // averaging all coords
-                network.findAverageStationCoords(startCode)
+                network.findAverageStationCoordsThrowing(startCode)
             } else {
                 // Otherwise we check the station's coords on the initial line
                 network.getStop(startCode, startLine).coords
@@ -35,7 +35,7 @@ class Route(startCode: String, conns: List<Connection>, network: Network) {
                     network.getStop(conn.station, nextConn.line).coords
                 } else {
                     // This is the final stop, so we just average all coords for this station
-                    network.findAverageStationCoords(conn.station)
+                    network.findAverageStationCoordsThrowing(conn.station)
                 }
             } else {
                 // Otherwise we just look up the coords for the station on the line you take to get there
