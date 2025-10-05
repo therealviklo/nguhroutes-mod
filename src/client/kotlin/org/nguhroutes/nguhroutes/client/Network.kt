@@ -12,10 +12,14 @@ import kotlinx.serialization.json.jsonPrimitive
 import net.minecraft.util.math.BlockPos
 import kotlin.collections.iterator
 
-const val supportedNetworkFormatVersion = "1.1"
+const val supportedNetworkFormatVersion = "2.0"
 
 data class Stop(val code: String, val coords: BlockPos, val time: Double? = null, val dist: Double? = null)
-data class Line(val name: String, val stops: List<Stop>, val loop: Boolean)
+data class Line(
+    val name: String,
+    val stops: List<Stop?>, // Kind of a dirty solution but null means impassable/reset
+    val loop: Boolean
+)
 
 class Network(obj: JsonObject) {
     val format: String = obj.getValue("format").jsonPrimitive.content
@@ -41,8 +45,17 @@ class Network(obj: JsonObject) {
                 val lineCode = lineObj.getValue("code").jsonPrimitive.content
                 val lineName = lineObj["name"]?.jsonPrimitive?.content ?: lineCode
                 val stops = lineObj.getValue("stops").jsonArray
-                val stopsMut = mutableListOf<Stop>()
+                val stopsMut = mutableListOf<Stop?>()
                 for (stop in stops) {
+                    when (stop) {
+                        is JsonPrimitive -> {
+                            if (stop.content == "impassable") {
+                                stopsMut.add(null)
+                                continue
+                            }
+                        }
+                        else -> {}
+                    }
                     val stopObj = stop.jsonObject
                     val code = prefixes.getValue(dimension.key) + stopObj.getValue("code").jsonPrimitive.content
                     val coords = stopObj.getValue("coords").jsonArray
@@ -121,7 +134,7 @@ class Network(obj: JsonObject) {
 
     fun getStop(code: String, line: String): Stop {
         // TODO: what if a station is on a line multiple times
-        return lines.getValue(line).stops.find{ it.code == code }
+        return lines.getValue(line).stops.find{ it != null && it.code == code }
             ?: throw IllegalArgumentException("Unable to find stop $code on $line")
     }
 
@@ -132,11 +145,13 @@ class Network(obj: JsonObject) {
         var n: Long = 0
         for (line in lines) {
             for (stop in line.value.stops) {
-                if (stop.code == code) {
-                    x += stop.coords.x
-                    y += stop.coords.y
-                    z += stop.coords.z
-                    n += 1
+                if (stop != null) {
+                    if (stop.code == code) {
+                        x += stop.coords.x
+                        y += stop.coords.y
+                        z += stop.coords.z
+                        n += 1
+                    }
                 }
             }
         }

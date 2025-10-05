@@ -1,7 +1,6 @@
 package org.nguhroutes.nguhroutes.client
 
 import com.mojang.brigadier.CommandDispatcher
-import com.mojang.brigadier.arguments.BoolArgumentType
 import com.mojang.brigadier.arguments.StringArgumentType
 import com.mojang.brigadier.builder.LiteralArgumentBuilder
 import com.mojang.brigadier.context.CommandContext
@@ -13,22 +12,29 @@ import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
+import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper
 import net.fabricmc.loader.api.FabricLoader
 import net.minecraft.client.MinecraftClient
+import net.minecraft.client.network.ClientPlayerEntity
+import net.minecraft.client.option.KeyBinding
+import net.minecraft.client.util.InputUtil
 import net.minecraft.client.world.ClientWorld
 import net.minecraft.command.CommandRegistryAccess
 import net.minecraft.text.Style
 import net.minecraft.text.Text
+import net.minecraft.text.TextColor
+import net.minecraft.util.Formatting
 import net.minecraft.util.Identifier
+import org.lwjgl.glfw.GLFW
 import java.net.URI
 import java.util.concurrent.atomic.AtomicReference
-import kotlin.collections.getOrNull
 
 
 class NguhroutesClient : ClientModInitializer {
     // TODO: nicer way of doing this?
     val nrDataLoadError: AtomicReference<Pair<NRData?, String?>> = AtomicReference(Pair(null, null))
     val currRoutePair: AtomicReference<Pair<Route, Int>?> = AtomicReference(null)
+    var tracker: Tracker? = null
 
     init {
         loadJson(false)
@@ -46,7 +52,7 @@ class NguhroutesClient : ClientModInitializer {
         currRoutePair.set(null)
         Thread {
             try {
-                val networkJson = downloadJson("https://nguhroutes.viklo.workers.dev/json/network.json")
+                val networkJson = downloadJson("https://mc.nguh.org/wiki/Data:NguhRoutes/network.json?action=raw")
                 val network = Network(networkJson.jsonObject)
                 val preCalcRoutes = PreCalcRoutes(network, noNether)
                 nrDataLoadError.compareAndSet(nullPair, Pair(NRData(network, preCalcRoutes), null))
@@ -70,6 +76,7 @@ class NguhroutesClient : ClientModInitializer {
     }
 
     override fun onInitializeClient() {
+        // Commands
         registerCommand(ClientCommandManager.literal("nguhroutes")
             .then(ClientCommandManager.literal("status")
                 .executes { context ->
@@ -163,7 +170,9 @@ class NguhroutesClient : ClientModInitializer {
                     val stations = mutableSetOf<String>()
                     for (line in jsonData.network.lines) {
                         for (stop in line.value.stops) {
-                            stations.add(stop.code)
+                            if (stop != null) {
+                                stations.add(stop.code)
+                            }
                         }
                     }
                     val selectedStation = stations.random()
@@ -207,7 +216,28 @@ class NguhroutesClient : ClientModInitializer {
                             }
                         }.start()
                         1
-                    })),
+                    }))
+            .then(ClientCommandManager.literal("measure")
+                .then(ClientCommandManager.literal("start")
+                    .executes { context ->
+                        startMeasuring(context.source.player)
+                        1
+                    })
+                .then(ClientCommandManager.literal("stop")
+                    .executes { context ->
+                        stopMeasuring(context.source.player, context)
+                        1
+                    })
+                .then(ClientCommandManager.literal("copy")
+                    .executes { context ->
+                        copyMeasuring(false, context.source.player, context)
+                        1
+                    }
+                    .then(ClientCommandManager.literal("both")
+                        .executes { context ->
+                            copyMeasuring(true, context.source.player, context)
+                            1
+                        }))),
             listOf("nr"))
         registerCommand(ClientCommandManager.literal("nrs")
             .then(ClientCommandManager.argument("dest", StringArgumentType.string())
@@ -225,6 +255,66 @@ class NguhroutesClient : ClientModInitializer {
                         1
                     })))
         ClientTickEvents.END_WORLD_TICK.register { clientWorld -> tick(clientWorld) }
+
+        // Keybinds
+        val bindingStartMeasuring: KeyBinding = KeyBindingHelper.registerKeyBinding(
+            KeyBinding(
+                "key.nguhroutes.start_measuring",
+                InputUtil.Type.KEYSYM,
+                GLFW.GLFW_KEY_UNKNOWN,
+                "key.category.nguhroutes"
+            )
+        )
+        val bindingStopMeasuring: KeyBinding = KeyBindingHelper.registerKeyBinding(
+            KeyBinding(
+                "key.nguhroutes.stop_measuring",
+                InputUtil.Type.KEYSYM,
+                GLFW.GLFW_KEY_UNKNOWN,
+                "key.category.nguhroutes"
+            )
+        )
+        val bindingCopyMeasuring: KeyBinding = KeyBindingHelper.registerKeyBinding(
+            KeyBinding(
+                "key.nguhroutes.copy_measuring",
+                InputUtil.Type.KEYSYM,
+                GLFW.GLFW_KEY_UNKNOWN,
+                "key.category.nguhroutes"
+            )
+        )
+        val bindingCopyBothMeasuring: KeyBinding = KeyBindingHelper.registerKeyBinding(
+            KeyBinding(
+                "key.nguhroutes.copy_both_measuring",
+                InputUtil.Type.KEYSYM,
+                GLFW.GLFW_KEY_UNKNOWN,
+                "key.category.nguhroutes"
+            )
+        )
+        ClientTickEvents.END_CLIENT_TICK.register { client ->
+            while (bindingStartMeasuring.wasPressed()) {
+                val player = client.player
+                if (player != null) {
+                    startMeasuring(player)
+                }
+            }
+            while (bindingStopMeasuring.wasPressed()) {
+                val player = client.player
+                if (player != null) {
+                    stopMeasuring(player, null)
+                }
+            }
+            while (bindingCopyMeasuring.wasPressed()) {
+                val player = client.player
+                if (player != null) {
+                    copyMeasuring(false, player, null)
+                }
+            }
+            while (bindingCopyBothMeasuring.wasPressed()) {
+                val player = client.player
+                if (player != null) {
+                    copyMeasuring(true, player, null)
+                }
+            }
+        }
     }
 
     private fun setRouteWithStart(context: CommandContext<FabricClientCommandSource>, start: String, dest: String) {
@@ -309,6 +399,13 @@ class NguhroutesClient : ClientModInitializer {
     }
 
     private fun tick(clientWorld: ClientWorld) {
+        currRouteLogic(clientWorld)
+        if (tracker != null && tracker!!.active) {
+            trackerLogic()
+        }
+    }
+
+    private fun currRouteLogic(clientWorld: ClientWorld) {
         val currRoutePair = currRoutePair.get() ?: return
         val currRoute = currRoutePair.first
         val currStop = currRoutePair.second
@@ -335,6 +432,44 @@ class NguhroutesClient : ClientModInitializer {
         }
     }
 
+    private fun trackerLogic() {
+        val player = MinecraftClient.getInstance().player
+        if (player != null) {
+            tracker!!.updatePos(player.blockPos)
+        }
+    }
+
+    private fun startMeasuring(player: ClientPlayerEntity) {
+        tracker = Tracker(player.blockPos)
+        player.sendMessage(Text.of("Measuring tracker started"), false)
+    }
+
+    private fun stopMeasuring(player: ClientPlayerEntity, context: CommandContext<FabricClientCommandSource>?) {
+        val tracker = tracker
+        if (tracker == null) {
+            sendError(Text.of("Measuring tracker is not active"), context)
+            return
+        }
+        tracker.stop(player.blockPos)
+        player.sendMessage(Text.of("Measuring tracker stopped"), false)
+        tracker.copyEndStop()
+        player.sendMessage(Text.of("End stop JSON copied to clipboard"), false)
+    }
+
+    private fun copyMeasuring(both: Boolean, player: ClientPlayerEntity, context: CommandContext<FabricClientCommandSource>?) {
+        val tracker = tracker
+        if (tracker == null) {
+            sendError(Text.of("Measuring tracker is not active"), context)
+            return
+        }
+        if (both) {
+            tracker.copyBothStops()
+        } else {
+            tracker.copyEndStop()
+        }
+        player.sendMessage(Text.of("End stop JSON copied to clipboard"), false)
+    }
+
     private fun stationList(context: CommandContext<FabricClientCommandSource>, ngationCode: String) {
         if (ngationCode.length != 2) {
             context.source.sendError(Text.literal("This command currently only works with 2-letter codes."))
@@ -346,9 +481,11 @@ class NguhroutesClient : ClientModInitializer {
         val stations = mutableSetOf<String>()
         for (line in jsonData.network.lines) {
             for (stop in line.value.stops) {
-                val code = stop.code
-                if (code.regionMatches(getPrefix(code).length, ngationCode, 0, 2)) {
-                    stations.add(code)
+                if (stop != null) {
+                    val code = stop.code
+                    if (code.regionMatches(getPrefix(code).length, ngationCode, 0, 2)) {
+                        stations.add(code)
+                    }
                 }
             }
         }
@@ -378,14 +515,18 @@ class NguhroutesClient : ClientModInitializer {
         val jsonData = nrDataLoadError.get().first
         if (jsonData == null) {
             val text = Text.of("Data has not loaded yet.")
-            if (context != null) {
-                context.source.sendError(text)
-            } else {
-                val player = MinecraftClient.getInstance().player ?: return null
-                player.sendMessage(text, false)
-            }
+            sendError(text, context)
             return null
         }
         return jsonData
+    }
+
+    private fun sendError(text: Text, context: CommandContext<FabricClientCommandSource>?) {
+        if (context != null) {
+            context.source.sendError(text)
+        } else {
+            val player = MinecraftClient.getInstance().player ?: return
+            player.sendMessage(text.getWithStyle(Style.EMPTY.withColor(TextColor.fromFormatting(Formatting.RED)))[0], false)
+        }
     }
 }

@@ -1,0 +1,7 @@
+{
+  "key.category.nguhroutes": "NguhRoutes",
+  "key.nguhroutes.start_measuring": "Start measuring",
+  "key.nguhroutes.stop_measuring": "Stop measuring",
+  "key.nguhroutes.copy_measuring": "Copy measuring JSON",
+  "key.nguhroutes.copy_both_measuring": "Copy measuring JSON (both stops)"
+}

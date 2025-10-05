@@ -68,7 +68,7 @@ class PreCalcRoutes {
                 if (firstStop == null) {
                     firstStop = stop
                 }
-                if (prevStop != null) {
+                if (prevStop != null && stop != null) { // stop is null when the line segment is impassable
                     addConnections(prevStop, stop)
                 }
                 prevStop = stop
