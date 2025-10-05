@@ -464,10 +464,11 @@ class NguhroutesClient : ClientModInitializer {
         }
         if (both) {
             tracker.copyBothStops()
+            player.sendMessage(Text.of("Both stops JSON copied to clipboard"), false)
         } else {
             tracker.copyEndStop()
+            player.sendMessage(Text.of("End stop JSON copied to clipboard"), false)
         }
-        player.sendMessage(Text.of("End stop JSON copied to clipboard"), false)
     }
 
     private fun stationList(context: CommandContext<FabricClientCommandSource>, ngationCode: String) {
