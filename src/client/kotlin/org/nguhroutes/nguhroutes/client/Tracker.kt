@@ -62,7 +62,7 @@ class Tracker(initialPos: BlockPos) {
             val clipboard = Clipboard()
             clipboard.setClipboard(0,
                 """
-                    |					{
+                    |{
                     |						"code": "",
                     |						"coords": [${startPos.x}, ${startPos.y}, ${startPos.z}],
                     |						"date": "$date"
