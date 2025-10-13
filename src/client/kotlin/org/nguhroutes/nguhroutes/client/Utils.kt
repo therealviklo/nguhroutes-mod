@@ -39,3 +39,10 @@ fun moveTime(pos: Vec3d, coords: BlockPos, secondsPerBlock: Double): Double {
 fun sprintTime(pos: Vec3d, coords: BlockPos): Double {
     return moveTime(pos, coords, 1 / 5.612)
 }
+
+/**
+ * Calculates the time it takes to walk in a straight line from pos to coords
+ */
+fun walkTime(pos: Vec3d, coords: BlockPos): Double {
+    return moveTime(pos, coords, 1 / 4.317)
+}

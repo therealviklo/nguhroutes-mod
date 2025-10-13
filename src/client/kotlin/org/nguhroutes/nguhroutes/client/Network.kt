@@ -12,7 +12,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import net.minecraft.util.math.BlockPos
 import kotlin.collections.iterator
 
-const val supportedNetworkFormatVersion = "2.0"
+const val supportedNetworkFormatVersion = "3.0"
 
 data class Stop(val code: String, val coords: BlockPos, val time: Double? = null, val dist: Double? = null)
 data class Line(
@@ -20,20 +20,21 @@ data class Line(
     val stops: List<Stop?>, // Kind of a dirty solution but null means impassable/reset
     val loop: Boolean
 )
+data class NetherConnection(val overworldCode: String, val overworldCoords: BlockPos, val netherCode: String, val netherCoords: BlockPos)
 
 class Network(obj: JsonObject) {
     val format: String = obj.getValue("format").jsonPrimitive.content
 
     init {
         if (format.split('.')[0] != supportedNetworkFormatVersion.split('.')[0]) {
-            throw RuntimeException("Network format ($format) is not supported ($supportedNetworkFormatVersion)")
+            throw RuntimeException("Network format ($format) is not supported (supported: $supportedNetworkFormatVersion). Perhaps you need to update the mod?")
         }
     }
 
 //    val version: String = obj.getValue("version").jsonPrimitive.content
 //    val date: String = obj.getValue("date").jsonPrimitive.content
     val lines: Map<String, Line>
-    val connections: List<Pair<String, String>>
+    val connections: List<NetherConnection>
     val stationNames: Map<String, List<String>>
 
     init {
@@ -74,22 +75,31 @@ class Network(obj: JsonObject) {
         }
         lines = linesMut
 
-        val connectionsMut = mutableListOf<Pair<String, String>>()
+        val connectionsMut = mutableListOf<NetherConnection>()
         val connectionsObject = obj["connections"]
         if (connectionsObject != null) {
             for (connection in connectionsObject.jsonArray) {
-                when (connection) {
-                    is JsonArray -> {
-                        val overworldCode = connection[0].jsonPrimitive.content
-                        val netherCode = prefixes["the_nether"] + connection[1].jsonPrimitive.content
-                        connectionsMut.add(Pair(overworldCode, netherCode))
-                    }
-                    is JsonPrimitive -> {
-                        val code = connection.content
-                        connectionsMut.add(Pair(code, prefixes["the_nether"] + code))
-                    }
-                    else -> throw RuntimeException("There is a connection is nether a string nor an array")
+                val connArr = connection.jsonArray
+                fun getConnCodeCoords(end: JsonObject): Pair<String, BlockPos> {
+                    val code = end.getValue("code").jsonPrimitive.content
+                    val coordsArr = end.getValue("coords").jsonArray
+                    val coords = BlockPos(
+                        coordsArr[0].jsonPrimitive.int,
+                        coordsArr[1].jsonPrimitive.int,
+                        coordsArr[2].jsonPrimitive.int
+                    )
+                    return Pair(code, coords)
                 }
+                val overworldEnd = connArr[0].jsonObject
+                val netherEnd = connArr[1].jsonObject
+                val overworldCodeCoords = getConnCodeCoords(overworldEnd)
+                val netherCodeCoords = getConnCodeCoords(netherEnd)
+                connectionsMut.add(NetherConnection(
+                    overworldCodeCoords.first,
+                    overworldCodeCoords.second,
+                    prefixes["the_nether"] + netherCodeCoords.first,
+                    netherCodeCoords.second)
+                )
             }
         }
         connections = connectionsMut
@@ -126,16 +136,24 @@ class Network(obj: JsonObject) {
                     }
                     else -> throw RuntimeException("Station ${station.key} has a name that is neither a string nor an array")
                 }
+                // People might want to search with an ampersand
+                val nameListSize = nameList.size
+                for (i in 0..<nameListSize) {
+                    if (nameList[i].contains('⁊')) {
+                        nameList.add(nameList[i].replace('⁊', '&'))
+                    }
+                }
+                // or with "and"
+                val nameListSize2 = nameList.size
+                for (i in 0..<nameListSize2) {
+                    if (nameList[i].contains('&')) {
+                        nameList.add(nameList[i].replace("&", "and"))
+                    }
+                }
                 stationNamesMut[station.key] = nameList
             }
         }
         stationNames = stationNamesMut
-    }
-
-    fun getStop(code: String, line: String): Stop {
-        // TODO: what if a station is on a line multiple times
-        return lines.getValue(line).stops.find{ it != null && it.code == code }
-            ?: throw IllegalArgumentException("Unable to find stop $code on $line")
     }
 
     fun findAverageStationCoords(code: String): BlockPos? {

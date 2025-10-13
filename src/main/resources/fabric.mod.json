@@ -6,7 +6,7 @@
   "description": "Route planning for Cenrail and more",
   "authors": [],
   "contact": {},
-  "license": "All-Rights-Reserved",
+  "license": "MIT",
   "icon": "assets/nguhroutes/icon.png",
   "environment": "client",
   "entrypoints": {

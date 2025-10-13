@@ -17,6 +17,7 @@ import net.fabricmc.loader.api.FabricLoader
 import net.minecraft.client.MinecraftClient
 import net.minecraft.client.network.ClientPlayerEntity
 import net.minecraft.client.option.KeyBinding
+import net.minecraft.client.util.Clipboard
 import net.minecraft.client.util.InputUtil
 import net.minecraft.client.world.ClientWorld
 import net.minecraft.command.CommandRegistryAccess
@@ -25,6 +26,7 @@ import net.minecraft.text.Text
 import net.minecraft.text.TextColor
 import net.minecraft.util.Formatting
 import net.minecraft.util.Identifier
+import net.minecraft.util.math.BlockPos
 import org.lwjgl.glfw.GLFW
 import java.net.URI
 import java.util.concurrent.atomic.AtomicReference
@@ -149,7 +151,7 @@ class NguhroutesClient : ClientModInitializer {
                     if (currRoutePair == null) {
                         context.source.sendError(Text.literal("No active route"))
                     } else {
-                        val jsonData = getJsonData(context) ?: return@executes 1
+                        val jsonData = getNRData(context) ?: return@executes 1
                         context.source.sendFeedback(Text.literal("Active route:"))
                         for (i in currRoutePair.first.stops.indices) {
                             val stop = currRoutePair.first.stops[i];
@@ -169,7 +171,7 @@ class NguhroutesClient : ClientModInitializer {
                     }))
             .then(ClientCommandManager.literal("random")
                 .executes { context ->
-                    val jsonData = getJsonData(context) ?: return@executes 1
+                    val jsonData = getNRData(context) ?: return@executes 1
                     val stations = mutableSetOf<String>()
                     for (line in jsonData.network.lines) {
                         for (stop in line.value.stops) {
@@ -186,7 +188,7 @@ class NguhroutesClient : ClientModInitializer {
                 .then(ClientCommandManager.argument("regex", StringArgumentType.greedyString())
                     .executes { context ->
                         val query = StringArgumentType.getString(context, "regex")
-                        val jsonData = getJsonData(context) ?: return@executes 1
+                        val jsonData = getNRData(context) ?: return@executes 1
                         Thread {
                             val finds = mutableListOf<Text>()
                             for (station in jsonData.network.stationNames) {
@@ -240,7 +242,13 @@ class NguhroutesClient : ClientModInitializer {
                         .executes { context ->
                             copyMeasuring(true, context.source.player, context)
                             1
-                        }))),
+                        }))
+                .then(ClientCommandManager.literal("coords")
+                    .executes { context ->
+                        copyBlockCoords(context.source.player.blockPos)
+                        context.source.sendFeedback(Text.of("Copied current coordinates to clipboard"))
+                        1
+                    })),
             listOf("nr"))
         registerCommand(ClientCommandManager.literal("nrs")
             .then(ClientCommandManager.argument("dest", StringArgumentType.string())
@@ -292,6 +300,14 @@ class NguhroutesClient : ClientModInitializer {
                 "key.category.nguhroutes"
             )
         )
+        val bindingCopyCoords: KeyBinding = KeyBindingHelper.registerKeyBinding(
+            KeyBinding(
+                "key.nguhroutes.copy_coords",
+                InputUtil.Type.KEYSYM,
+                GLFW.GLFW_KEY_UNKNOWN,
+                "key.category.nguhroutes"
+            )
+        )
         ClientTickEvents.END_CLIENT_TICK.register { client ->
             while (bindingStartMeasuring.wasPressed()) {
                 val player = client.player
@@ -317,11 +333,18 @@ class NguhroutesClient : ClientModInitializer {
                     copyMeasuring(true, player, null)
                 }
             }
+            while (bindingCopyCoords.wasPressed()) {
+                val player = client.player
+                if (player != null) {
+                    copyBlockCoords(player.blockPos)
+                    player.sendMessage(Text.of("Copied current coordinates to clipboard"), false)
+                }
+            }
         }
     }
 
     private fun setRouteWithStart(context: CommandContext<FabricClientCommandSource>, start: String, dest: String) {
-        val jsonData = getJsonData(context) ?: return
+        val jsonData = getNRData(context) ?: return
 
         val route = jsonData.preCalcRoutes.routes[Pair(start, dest)]
         if (route == null) {
@@ -335,7 +358,7 @@ class NguhroutesClient : ClientModInitializer {
     }
 
     private fun setRoute(context: CommandContext<FabricClientCommandSource>, dest: String) {
-        val jsonData = getJsonData(context) ?: return
+        val jsonData = getNRData(context) ?: return
         Thread {
             val playerPos = context.source?.player?.pos
             if (playerPos == null) {
@@ -354,11 +377,7 @@ class NguhroutesClient : ClientModInitializer {
                 if (route.key.second == dest) {
                     stationHasBeenSeen = true
                     if (context.source!!.player.clientWorld.registryKey.value == Identifier.of(getDim(route.key.first))) {
-                        val firstStopCoords = if (route.value.conns[0].line == "Interdimensional transfer") {
-                            jsonData.network.findAverageStationCoords(route.key.first)
-                        } else {
-                            jsonData.network.getStop(route.key.first, route.value.conns[0].line).coords
-                        }
+                        val firstStopCoords = route.value.conns.getOrNull(0)?.fromCoords
 
                         // If we can't determine the coords for the initial stop we can't use that route
                         if (firstStopCoords == null) {
@@ -485,12 +504,17 @@ class NguhroutesClient : ClientModInitializer {
         }
     }
 
+    private fun copyBlockCoords(coords: BlockPos) {
+        val clipboard = Clipboard()
+        clipboard.setClipboard(0, "${coords.x}, ${coords.y}, ${coords.z}")
+    }
+
     private fun stationList(context: CommandContext<FabricClientCommandSource>, ngationCode: String) {
         if (ngationCode.length != 2) {
             context.source.sendError(Text.literal("This command currently only works with 2-letter codes."))
             return
         }
-        val jsonData = getJsonData(context) ?: return
+        val jsonData = getNRData(context) ?: return
 
         context.source.sendFeedback(Text.literal("All stations in $ngationCode:"))
         val stations = mutableSetOf<String>()
@@ -511,7 +535,7 @@ class NguhroutesClient : ClientModInitializer {
     }
 
     private fun sendNextStopMessage(stop: RouteStop, context: CommandContext<FabricClientCommandSource>? = null) {
-        val jsonData = getJsonData(context) ?: return
+        val jsonData = getNRData(context) ?: return
         val name = jsonData.network.stationNames[stop.code]?.getOrNull(0) ?: stop.code
         sendRouteMessage("Next: ${name} (${stop.code}, ${stop.lineName})")
     }
@@ -524,16 +548,22 @@ class NguhroutesClient : ClientModInitializer {
     }
 
     /**
-     * Gets the JsonData and prints a message if it does not exist.
+     * Gets the NRData and prints a message if it does not exist.
      */
-    private fun getJsonData(context: CommandContext<FabricClientCommandSource>? = null): NRData? {
-        val jsonData = nrDataLoadError.get().first
-        if (jsonData == null) {
-            val text = Text.of("Data has not loaded yet.")
-            sendError(text, context)
+    private fun getNRData(context: CommandContext<FabricClientCommandSource>? = null): NRData? {
+        val nrDataLoadError = nrDataLoadError.get()
+        val nrData = nrDataLoadError.first
+        if (nrData == null) {
+            if (nrDataLoadError.second == null) {
+                val text = Text.of("Data has not loaded yet.")
+                sendError(text, context)
+            } else {
+                sendError(Text.of("Error when loading:"), context)
+                sendError(Text.of(nrDataLoadError.second), context)
+            }
             return null
         }
-        return jsonData
+        return nrData
     }
 
     private fun sendError(text: Text, context: CommandContext<FabricClientCommandSource>? = null) {
