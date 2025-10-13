@@ -4,7 +4,7 @@ import net.minecraft.util.math.BlockPos
 
 data class RouteStop(val code: String, val coords: BlockPos, val dimension: String, val lineCode: String?, val lineName: String)
 
-class Route(startCode: String, conns: List<Connection>, network: Network) {
+class Route(startCode: String, conns: List<Connection>, network: Network, warpStart: Boolean = false) {
     val stops: List<RouteStop>
 
     init {
@@ -15,7 +15,13 @@ class Route(startCode: String, conns: List<Connection>, network: Network) {
         } else {
             conns[0].fromCoords
         }
-        stopsMut.add(RouteStop(startCode, startCoords, getDim(startCode), null, "Start"))
+        stopsMut.add(RouteStop(
+            startCode,
+            startCoords,
+            getDim(startCode),
+            null,
+            if (warpStart) "Warp" else "Start"
+        ))
 
         for (i in conns.indices) {
             val conn = conns[i]

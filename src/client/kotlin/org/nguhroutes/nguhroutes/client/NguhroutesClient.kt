@@ -419,12 +419,31 @@ class NguhroutesClient : ClientModInitializer {
                 }
             }
 
+            var warpStart = false
+            fun checkIfWarpIsFaster(code: String, warpCoords: BlockPos) {
+                val route = jsonData.preCalcRoutes.routes[Pair(code, dest)]
+                if (route != null) {
+                    val firstStopCoords = route.conns.getOrNull(0)?.fromCoords ?: return
+                    // Time is the time it takes for the route, plus the time it takes to walk to the actual station
+                    // from the warp, plus 3 seconds as an estimate for typing in and performing the warp
+                    val time = route.time + walkTime(warpCoords.toBottomCenterPos(), firstStopCoords) + 3.0
+                    if (time < fastestRouteTime) {
+                        fastestRoute = route
+                        fastestRouteStart = code
+                        fastestRouteTime = time
+                        warpStart = true
+                    }
+                }
+            }
+            checkIfWarpIsFaster("MZS", BlockPos(0, 163, 0))
+            checkIfWarpIsFaster("XG3", BlockPos(-7993, 63, -7994))
+
             if (fastestRoute == null) {
                 context.source.sendError(Text.literal("Could not find route."))
                 return@Thread
             }
 
-            val routeObj = Route(fastestRouteStart!!, fastestRoute.conns, jsonData.network)
+            val routeObj = Route(fastestRouteStart!!, fastestRoute.conns, jsonData.network, warpStart)
             currRoutePair.set(Pair(routeObj, 0))
 
             sendNextStopMessage(routeObj.stops[0], context)
