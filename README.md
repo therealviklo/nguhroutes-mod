@@ -1,5 +1,5 @@
 # ***NguhRoutes*** mod
-This is the mod version of NguhRoutes. It is currently pretty basic but it can give you a route to a station and tell you where you need to go next. It fetches the data for the network and routes from the website.
+This is the mod version of NguhRoutes. It is currently pretty basic but it can give you a route to a station and tell you where you need to go next. It fetches the data for the network from the wiki.
 
 **If you don't want to compile it yourself, go to releases on the side and download the jar from there.** Note that the mod requires you to have the Kotlin support installed, which you probably have for the main Nguhcraft mod, but you may have to get a newer version. If there is a such an issue it will give you an error when you try to launch.
 
