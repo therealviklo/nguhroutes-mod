@@ -13,10 +13,15 @@ import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallba
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElement
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry
+import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements
 import net.fabricmc.loader.api.FabricLoader
 import net.minecraft.client.MinecraftClient
+import net.minecraft.client.gui.DrawContext
 import net.minecraft.client.network.ClientPlayerEntity
 import net.minecraft.client.option.KeyBinding
+import net.minecraft.client.render.RenderTickCounter
 import net.minecraft.client.util.Clipboard
 import net.minecraft.client.util.InputUtil
 import net.minecraft.client.world.ClientWorld
@@ -26,13 +31,17 @@ import net.minecraft.text.Text
 import net.minecraft.text.TextColor
 import net.minecraft.util.Formatting
 import net.minecraft.util.Identifier
+import net.minecraft.util.Util
 import net.minecraft.util.math.BlockPos
+import net.minecraft.util.math.ColorHelper
+import net.minecraft.util.math.MathHelper
+import net.minecraft.util.math.Vec3d
 import org.lwjgl.glfw.GLFW
 import java.net.URI
 import java.util.concurrent.atomic.AtomicReference
 
 
-class NguhroutesClient : ClientModInitializer {
+class NguhroutesClient : ClientModInitializer, HudElement {
     // TODO: nicer way of doing this?
     val nrDataLoadError: AtomicReference<Pair<NRData?, String?>> = AtomicReference(Pair(null, null))
     val currRoutePair: AtomicReference<Pair<Route, Int>?> = AtomicReference(null)
@@ -341,6 +350,60 @@ class NguhroutesClient : ClientModInitializer {
                 }
             }
         }
+
+        HudElementRegistry.attachElementBefore(VanillaHudElements.CHAT, Identifier.of("nguhroutes", "before_chat"), this)
+    }
+
+    override fun render(context: DrawContext, tickCounter: RenderTickCounter) {
+        val currRoutePair = currRoutePair.get() ?: return
+        val currRoute = currRoutePair.first
+        val currStop = currRoutePair.second
+        if (currStop >= currRoute.stops.size) return
+        renderWaypoint(context, currRoute.stops[currStop].coords.toCenterPos(), "Next", "(Maybe wrong side)")
+    }
+
+    private fun renderWaypoint(context: DrawContext, pos: Vec3d, text: String, text2: String?) {
+        val player = MinecraftClient.getInstance().player ?: return
+        val camera = MinecraftClient.getInstance().cameraEntity ?: return
+        val matrices = context.matrices
+
+//        val x = 33 - player.x
+//        val y = 82 - player.y - 1
+//        val z = -(-14 - player.z)
+        val eye = camera.eyePos
+        val x = pos.x.toFloat() - eye.x.toFloat()
+        val y = pos.y.toFloat() - eye.y.toFloat()
+        val z = -(pos.z.toFloat() - eye.z.toFloat())
+
+//        val tx = -player.renderPitch * MathHelper.RADIANS_PER_DEGREE
+//        val ty = player.renderYaw * MathHelper.RADIANS_PER_DEGREE
+////        val tz = 0.0f
+        val tx = -camera.pitch * MathHelper.RADIANS_PER_DEGREE
+        val ty = camera.yaw * MathHelper.RADIANS_PER_DEGREE
+//        val tz = 0.0f
+
+        val dz = MathHelper.cos(tx) * (MathHelper.cos(ty) * z + MathHelper.sin(ty) * (/* MathHelper.sin(tz) * y + */ /* MathHelper.cos(tz) * */ x)) - MathHelper.sin(tx) * (/* MathHelper.cos(tz) * */ y /* + MathHelper.sin(tz) * x */)
+        if (dz < 0.0f) {
+            val dx = MathHelper.cos(ty) * (/* MathHelper.sin(tz) * y + */ /* MathHelper.cos(tz) * */ x) - MathHelper.sin(ty) * z
+            val dy = MathHelper.sin(tx) * (MathHelper.cos(ty) * z + MathHelper.sin(ty) * (/* MathHelper.sin(tz) * y + */ /* MathHelper.cos(tz) * */ x)) + MathHelper.cos(tx) * (/* MathHelper.cos(tz) * */ y /* + MathHelper.sin(tz) * x */)
+
+            val fov = MinecraftClient.getInstance().options.fov.value / 100.0f * player.getFovMultiplier(true, 1.0f)
+            player.sendMessage(Text.of(fov.toString()), true)
+            val scale = context.scaledWindowHeight * 0.5f / fov
+            val bx = 1.0f / dz * dx * scale + context.scaledWindowWidth / 2.0f
+            val by = 1.0f / dz * dy * scale + context.scaledWindowHeight / 2.0f
+
+            matrices.pushMatrix()
+            matrices.translate(bx, by)
+            matrices.rotate(MathHelper.HALF_PI * 0.5f)
+            context.fill(-5, -5, 5, 5, 0xFFFFFFFF.toInt())
+            matrices.popMatrix()
+            val tr = MinecraftClient.getInstance().textRenderer
+            context.drawCenteredTextWithShadow(tr, text, bx.toInt(), by.toInt() + 10, 0xFFFFFFFF.toInt())
+            if (text2 != null) {
+                context.drawCenteredTextWithShadow(tr, text2, bx.toInt(), by.toInt() + 10 + tr.fontHeight, 0xFFFFFFFF.toInt())
+            }
+        }
     }
 
     private fun setRouteWithStart(context: CommandContext<FabricClientCommandSource>, start: String, dest: String) {
@@ -353,6 +416,7 @@ class NguhroutesClient : ClientModInitializer {
         }
         val routeObj = Route(start, route.conns, jsonData.network)
         currRoutePair.set(Pair(routeObj, 0))
+        context.source.sendFeedback(Text.of("$start-$dest: ${route.time}"))
 
         sendNextStopMessage(routeObj.stops[0], context)
     }
@@ -427,6 +491,7 @@ class NguhroutesClient : ClientModInitializer {
                     // Time is the time it takes for the route, plus the time it takes to walk to the actual station
                     // from the warp, plus 3 seconds as an estimate for typing in and performing the warp
                     val time = route.time + walkTime(warpCoords.toBottomCenterPos(), firstStopCoords) + 3.0
+                    context.source.sendFeedback(Text.of("$code: $time; $fastestRouteTime"))
                     if (time < fastestRouteTime) {
                         fastestRoute = route
                         fastestRouteStart = code
