@@ -58,8 +58,9 @@ class Network(obj: JsonObject) {
                         else -> {}
                     }
                     val stopObj = stop.jsonObject
+                    val coordsVal = stopObj["coords"] ?: continue
                     val code = prefixes.getValue(dimension.key) + stopObj.getValue("code").jsonPrimitive.content
-                    val coords = stopObj.getValue("coords").jsonArray
+                    val coords = coordsVal.jsonArray
                     val x = coords[0].jsonPrimitive.int
                     val y = coords[1].jsonPrimitive.int
                     val z = coords[2].jsonPrimitive.int

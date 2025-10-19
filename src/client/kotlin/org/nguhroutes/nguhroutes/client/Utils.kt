@@ -2,6 +2,7 @@ package org.nguhroutes.nguhroutes.client
 
 import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Vec3d
+import kotlin.math.sqrt
 
 /**
  * Returns true if the distance between a and b is less than dist
@@ -30,7 +31,7 @@ fun distCloser(p: BlockPos, a: BlockPos, b: BlockPos): Boolean {
  * Calculates the time it takes to move in a straight line from pos to coords, given a speed expressed in seconds per block
  */
 fun moveTime(pos: Vec3d, coords: BlockPos, secondsPerBlock: Double): Double {
-    return coords.getSquaredDistance(pos) * secondsPerBlock
+    return sqrt(coords.getSquaredDistance(pos)) * secondsPerBlock
 }
 
 /**
