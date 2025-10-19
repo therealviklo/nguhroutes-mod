@@ -2,6 +2,8 @@ package org.nguhroutes.nguhroutes.client
 
 import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Vec3d
+import kotlin.math.round
+import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
 /**
@@ -46,4 +48,15 @@ fun sprintTime(pos: Vec3d, coords: BlockPos): Double {
  */
 fun walkTime(pos: Vec3d, coords: BlockPos): Double {
     return moveTime(pos, coords, 1 / 4.317)
+}
+
+/**
+ * Formats a distance in metres or kilometres.
+ */
+fun prettyDist(dist: Double): String {
+    return if (dist < 1000) {
+        "${dist.roundToInt()} m"
+    } else {
+        String.format("%.1f km", dist / 1000)
+    }
 }

@@ -359,25 +359,36 @@ class NguhroutesClient : ClientModInitializer, HudElement {
         val currRoute = currRoutePair.first
         val currStop = currRoutePair.second
         if (currStop >= currRoute.stops.size) return
-        renderWaypoint(context, currRoute.stops[currStop].coords.toCenterPos(), "Next", "(Maybe wrong side)")
+        val colour = 0xFFFFFFFF.toInt()
+        val clientWorld = MinecraftClient.getInstance().player?.clientWorld ?: return
+        val fromCoordsDim = currRoute.stops[currStop].fromCoordsDim
+        if (fromCoordsDim == null) {
+            if (checkPlayerDim(currRoute.stops[currStop].dimension, clientWorld))
+                renderWaypoint(context, currRoute.stops[currStop].coords.toCenterPos(), "Next", "(Approx.)", true, colour, 0xFF)
+        } else {
+            val fromCoords = fromCoordsDim.first
+            val fromDim = fromCoordsDim.second
+            if (checkPlayerDim(fromDim, clientWorld)) {
+                val text = if (currRoute.stops[currStop].lineName == "Interdimensional transfer") "Next portal" else "Next platform"
+                renderWaypoint(context, fromCoords.toCenterPos(), text, "(Approx.)", true, colour, 0xFF)
+            }
+            if (checkPlayerDim(currRoute.stops[currStop].dimension, clientWorld))
+                renderWaypoint(context, currRoute.stops[currStop].coords.toCenterPos(), "Next stop", "(Approx.)", false, colour, 0x7F)
+        }
     }
 
-    private fun renderWaypoint(context: DrawContext, pos: Vec3d, text: String, text2: String?) {
+    private fun renderWaypoint(context: DrawContext, pos: Vec3d, text: String, text2: String?, angled: Boolean, colour: Int, opacity: Int) {
         val player = MinecraftClient.getInstance().player ?: return
         val camera = MinecraftClient.getInstance().cameraEntity ?: return
         val matrices = context.matrices
 
-//        val x = 33 - player.x
-//        val y = 82 - player.y - 1
-//        val z = -(-14 - player.z)
+        val colour = (colour and 0x00FFFFFF) or ((opacity and 0xFF) shl 24)
+
         val eye = camera.eyePos
         val x = pos.x.toFloat() - eye.x.toFloat()
         val y = pos.y.toFloat() - eye.y.toFloat()
         val z = -(pos.z.toFloat() - eye.z.toFloat())
 
-//        val tx = -player.renderPitch * MathHelper.RADIANS_PER_DEGREE
-//        val ty = player.renderYaw * MathHelper.RADIANS_PER_DEGREE
-////        val tz = 0.0f
         val tx = -camera.pitch * MathHelper.RADIANS_PER_DEGREE
         val ty = camera.yaw * MathHelper.RADIANS_PER_DEGREE
 //        val tz = 0.0f
@@ -388,21 +399,32 @@ class NguhroutesClient : ClientModInitializer, HudElement {
             val dy = MathHelper.sin(tx) * (MathHelper.cos(ty) * z + MathHelper.sin(ty) * (/* MathHelper.sin(tz) * y + */ /* MathHelper.cos(tz) * */ x)) + MathHelper.cos(tx) * (/* MathHelper.cos(tz) * */ y /* + MathHelper.sin(tz) * x */)
 
             val fov = MinecraftClient.getInstance().options.fov.value / 100.0f * player.getFovMultiplier(true, 1.0f)
-            player.sendMessage(Text.of(fov.toString()), true)
             val scale = context.scaledWindowHeight * 0.5f / fov
             val bx = 1.0f / dz * dx * scale + context.scaledWindowWidth / 2.0f
             val by = 1.0f / dz * dy * scale + context.scaledWindowHeight / 2.0f
 
             matrices.pushMatrix()
             matrices.translate(bx, by)
-            matrices.rotate(MathHelper.HALF_PI * 0.5f)
-            context.fill(-5, -5, 5, 5, 0xFFFFFFFF.toInt())
+            if (angled)
+                matrices.rotate(MathHelper.HALF_PI * 0.5f)
+            context.fill(-5, -5, 5, 5, colour)
             matrices.popMatrix()
+
             val tr = MinecraftClient.getInstance().textRenderer
-            context.drawCenteredTextWithShadow(tr, text, bx.toInt(), by.toInt() + 10, 0xFFFFFFFF.toInt())
-            if (text2 != null) {
-                context.drawCenteredTextWithShadow(tr, text2, bx.toInt(), by.toInt() + 10 + tr.fontHeight, 0xFFFFFFFF.toInt())
+
+            var yBelow = by.toInt() + 10
+            fun drawTextBelow(text: String) {
+                context.drawCenteredTextWithShadow(tr, text, bx.toInt(), yBelow, colour)
+                yBelow += tr.fontHeight
             }
+
+            drawTextBelow(text)
+            if (text2 != null) {
+                drawTextBelow(text2)
+            }
+
+            val dist = pos.distanceTo(player.pos)
+            drawTextBelow(prettyDist(dist))
         }
     }
 
@@ -416,7 +438,6 @@ class NguhroutesClient : ClientModInitializer, HudElement {
         }
         val routeObj = Route(start, route.conns, jsonData.network)
         currRoutePair.set(Pair(routeObj, 0))
-        context.source.sendFeedback(Text.of("$start-$dest: ${route.time}"))
 
         sendNextStopMessage(routeObj.stops[0], context)
     }
@@ -440,7 +461,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                     continue
                 if (route.key.second == dest) {
                     stationHasBeenSeen = true
-                    if (context.source!!.player.clientWorld.registryKey.value == Identifier.of(getDim(route.key.first))) {
+                    if (checkPlayerDim(getDim(route.key.first), context.source.player.clientWorld)) {
                         val firstStopCoords = route.value.conns.getOrNull(0)?.fromCoords
 
                         // If we can't determine the coords for the initial stop we can't use that route
@@ -470,7 +491,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                 return@Thread
             }
 
-            if (context.source!!.player.clientWorld.registryKey.value == Identifier.of(getDim(dest))) {
+            if (checkPlayerDim(getDim(dest), context.source.player.clientWorld)) {
                 // Check if just sprinting there is faster
                 val coords = jsonData.network.findAverageStationCoords(dest)
                 if (coords != null) {
@@ -491,7 +512,6 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                     // Time is the time it takes for the route, plus the time it takes to walk to the actual station
                     // from the warp, plus 3 seconds as an estimate for typing in and performing the warp
                     val time = route.time + walkTime(warpCoords.toBottomCenterPos(), firstStopCoords) + 3.0
-                    context.source.sendFeedback(Text.of("$code: $time; $fastestRouteTime"))
                     if (time < fastestRouteTime) {
                         fastestRoute = route
                         fastestRouteStart = code
@@ -533,7 +553,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
         val player = MinecraftClient.getInstance().player ?: return
         val playerCoords = player.blockPos
         if (distLess(playerCoords, currRoute.stops[currStop].coords, 50) &&
-            clientWorld.registryKey.value == Identifier.of(currRoute.stops[currStop].dimension) &&
+            checkPlayerDim(currRoute.stops[currStop].dimension, clientWorld) &&
             (currStop == 0 || currRoute.stops[currStop].dimension != currRoute.stops[currStop - 1].dimension || distCloser(
                 playerCoords,
                 currRoute.stops[currStop].coords,
@@ -657,5 +677,9 @@ class NguhroutesClient : ClientModInitializer, HudElement {
             val player = MinecraftClient.getInstance().player ?: return
             player.sendMessage(text.getWithStyle(Style.EMPTY.withColor(TextColor.fromFormatting(Formatting.RED)))[0], false)
         }
+    }
+
+    private fun checkPlayerDim(dim: String, clientWorld: ClientWorld): Boolean {
+        return clientWorld.registryKey.value == Identifier.of(dim)
     }
 }

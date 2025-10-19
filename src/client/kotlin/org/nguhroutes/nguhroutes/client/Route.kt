@@ -1,8 +1,16 @@
 package org.nguhroutes.nguhroutes.client
 
 import net.minecraft.util.math.BlockPos
+import net.minecraft.util.math.Vec3d
 
-data class RouteStop(val code: String, val coords: BlockPos, val dimension: String, val lineCode: String?, val lineName: String)
+data class RouteStop(
+    val code: String,
+    val coords: BlockPos,
+    val dimension: String,
+    val lineCode: String?,
+    val lineName: String,
+    val fromCoordsDim: Pair<BlockPos, String>?
+)
 
 class Route(startCode: String, conns: List<Connection>, network: Network, warpStart: Boolean = false) {
     val stops: List<RouteStop>
@@ -20,9 +28,11 @@ class Route(startCode: String, conns: List<Connection>, network: Network, warpSt
             startCoords,
             getDim(startCode),
             null,
-            if (warpStart) "Warp" else "Start"
+            if (warpStart) "Warp" else "Start",
+            null
         ))
 
+        var lastDimension = getDim(startCode)
         for (i in conns.indices) {
             val conn = conns[i]
             val coords: BlockPos = conns[i].toCoords
@@ -31,7 +41,10 @@ class Route(startCode: String, conns: List<Connection>, network: Network, warpSt
                 coords,
                 getDim(conn.station),
                 conn.line,
-                network.lines[conn.line]?.name ?: conn.line))
+                network.lines[conn.line]?.name ?: conn.line,
+                Pair(conn.fromCoords, lastDimension)
+            ))
+            lastDimension = getDim(conn.station)
         }
         stops = stopsMut
     }
