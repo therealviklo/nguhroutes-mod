@@ -409,12 +409,12 @@ class NguhroutesClient : ClientModInitializer, HudElement {
             val dy = MathHelper.sin(tx) * (MathHelper.cos(ty) * z + MathHelper.sin(ty) * (/* MathHelper.sin(tz) * y + */ /* MathHelper.cos(tz) * */ x)) + MathHelper.cos(tx) * (/* MathHelper.cos(tz) * */ y /* + MathHelper.sin(tz) * x */)
 
             // Not quite sure what's going on with the fov but this makes it look correct enough
-            val fov1 = MinecraftClient.getInstance().options.fov.value / 100.0f * player.getFovMultiplier(true, 1.0f)
+            val fov1 = MinecraftClient.getInstance().options.fov.value / 0.001f * player.getFovMultiplier(true, 1.0f)
             val fov2 = fov1 * (1.25f + MathHelper.square(fov1 - 0.3f))
             val scale = context.scaledWindowHeight * 0.5f / 0.7f / fov2
-            
-            val bx = 1.0f / dz * dx * scale + context.scaledWindowWidth / 2.0f
-            val by = 1.0f / dz * dy * scale + context.scaledWindowHeight / 2.0f
+
+            val bx = 1.0f / dz * dx * scale + context.scaledWindowWidth * 0.5f
+            val by = 1.0f / dz * dy * scale + context.scaledWindowHeight * 0.5f
 
             matrices.pushMatrix()
             matrices.translate(bx, by)
