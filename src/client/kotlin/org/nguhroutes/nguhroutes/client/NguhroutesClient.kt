@@ -378,12 +378,17 @@ class NguhroutesClient : ClientModInitializer, HudElement {
         } else {
             val fromCoords = fromCoordsDim.first
             val fromDim = fromCoordsDim.second
+            val text2 = if (currRoute.stops[currStop].reverseDirection) {
+                "(Probably wrong side of the platform)"
+            } else {
+                null
+            }
             if (checkPlayerDim(fromDim, clientWorld)) {
                 val text = if (currRoute.stops[currStop].lineName == "Interdimensional transfer") "Next portal" else "Next platform"
-                renderWaypoint(context, fromCoords.toCenterPos(), text, "(Approx.)", true, colour, 0xFF)
+                renderWaypoint(context, fromCoords.toCenterPos(), text, text2, true, colour, 0xFF)
             }
             if (checkPlayerDim(currRoute.stops[currStop].dimension, clientWorld))
-                renderWaypoint(context, currRoute.stops[currStop].coords.toCenterPos(), "Next stop", "(Approx.)", false, colour, 0x7F)
+                renderWaypoint(context, currRoute.stops[currStop].coords.toCenterPos(), "Next stop", text2, false, colour, 0x7F)
         }
     }
 
@@ -409,7 +414,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
             val dy = MathHelper.sin(tx) * (MathHelper.cos(ty) * z + MathHelper.sin(ty) * (/* MathHelper.sin(tz) * y + */ /* MathHelper.cos(tz) * */ x)) + MathHelper.cos(tx) * (/* MathHelper.cos(tz) * */ y /* + MathHelper.sin(tz) * x */)
 
             // Not quite sure what's going on with the fov but this makes it look correct enough
-            val fov1 = MinecraftClient.getInstance().options.fov.value / 0.001f * player.getFovMultiplier(true, 1.0f)
+            val fov1 = MinecraftClient.getInstance().options.fov.value * 0.01f * player.getFovMultiplier(true, 1.0f)
             val fov2 = fov1 * (1.25f + MathHelper.square(fov1 - 0.3f))
             val scale = context.scaledWindowHeight * 0.5f / 0.7f / fov2
 
@@ -432,11 +437,10 @@ class NguhroutesClient : ClientModInitializer, HudElement {
             }
 
             drawTextBelow(text)
-            if (text2 != null) {
+            val dist = pos.distanceTo(player.pos)
+            if (text2 != null && dist < 20.0) {
                 drawTextBelow(text2)
             }
-
-            val dist = pos.distanceTo(player.pos)
             drawTextBelow(prettyDist(dist))
         }
     }

@@ -9,7 +9,12 @@ data class RouteStop(
     val dimension: String,
     val lineCode: String?,
     val lineName: String,
-    val fromCoordsDim: Pair<BlockPos, String>?
+    val fromCoordsDim: Pair<BlockPos, String>?,
+    /**
+     * This means that this connection is not in the direction that the line was surveyed, and that there should thus
+     * be a warning that the coords may be inaccurate
+     */
+    val reverseDirection: Boolean,
 )
 
 class Route(startCode: String, conns: List<Connection>, network: Network, warpStart: Boolean = false) {
@@ -29,7 +34,8 @@ class Route(startCode: String, conns: List<Connection>, network: Network, warpSt
             getDim(startCode),
             null,
             if (warpStart) "Warp" else "Start",
-            null
+            null,
+            false
         ))
 
         var lastDimension = getDim(startCode)
@@ -42,7 +48,8 @@ class Route(startCode: String, conns: List<Connection>, network: Network, warpSt
                 getDim(conn.station),
                 conn.line,
                 network.lines[conn.line]?.name ?: conn.line,
-                Pair(conn.fromCoords, lastDimension)
+                Pair(conn.fromCoords, lastDimension),
+                conn.reverseDirection
             ))
             lastDimension = getDim(conn.station)
         }

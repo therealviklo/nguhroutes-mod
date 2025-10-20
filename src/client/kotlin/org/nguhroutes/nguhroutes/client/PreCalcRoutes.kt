@@ -22,7 +22,17 @@ const val supportedRoutesFormatVersion = "1.0"
  */
 const val minecartSpeedFactor: Double = 1.0 / 100.0
 
-data class Connection(val station: String, val line: String, val fromCoords: BlockPos, val toCoords: BlockPos)
+data class Connection(
+    val station: String,
+    val line: String,
+    val fromCoords: BlockPos,
+    val toCoords: BlockPos,
+    /**
+     * This means that this connection is not in the direction that the line was surveyed, and that there should thus
+     * be a warning that the coords may be inaccurate
+     */
+    val reverseDirection: Boolean,
+)
 data class PreCalcRoute(val time: Double, val conns: List<Connection>)
 
 class PreCalcRoutes {
@@ -59,21 +69,22 @@ class PreCalcRoutes {
                     val dist = abs(from.coords.x - to.coords.x) + abs(from.coords.z - to.coords.z)
                     dist * minecartSpeedFactor
                 }
-                fun addConnection(from: Stop, to: Stop) {
+                fun addConnection(from: Stop, to: Stop, reverseDirection: Boolean) {
                     stations.getValue(from.code).conns.add(
                         CostConnection(
                             Connection(
                                 to.code,
                                 line.key,
                                 from.coords,
-                                to.coords
+                                to.coords,
+                                reverseDirection
                             ),
                             cost
                         )
                     )
                 }
-                addConnection(from, to)
-                addConnection(to, from)
+                addConnection(from, to, false)
+                addConnection(to, from, true)
             }
             var firstStop: Stop? = null
             var prevStop: Stop? = null
@@ -103,7 +114,8 @@ class PreCalcRoutes {
                                 to,
                                 "Interdimensional transfer",
                                 fromCoords,
-                                toCoords
+                                toCoords,
+                                false
                             ),
                             // This is the time that you have to stand in a portal
                             4.0
