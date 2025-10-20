@@ -361,7 +361,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
             }
         }
 
-        HudElementRegistry.attachElementBefore(VanillaHudElements.CHAT, Identifier.of("nguhroutes", "before_chat"), this)
+        HudElementRegistry.addFirst(Identifier.of("nguhroutes", "before_chat"), this)
     }
 
     override fun render(context: DrawContext, tickCounter: RenderTickCounter) {
