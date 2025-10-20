@@ -1,6 +1,7 @@
 package org.nguhroutes.nguhroutes.client
 
 import com.mojang.brigadier.CommandDispatcher
+import com.mojang.brigadier.arguments.FloatArgumentType
 import com.mojang.brigadier.arguments.StringArgumentType
 import com.mojang.brigadier.builder.LiteralArgumentBuilder
 import com.mojang.brigadier.context.CommandContext
@@ -39,6 +40,7 @@ import net.minecraft.util.math.Vec3d
 import org.lwjgl.glfw.GLFW
 import java.net.URI
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.math.pow
 
 
 class NguhroutesClient : ClientModInitializer, HudElement {
@@ -46,6 +48,8 @@ class NguhroutesClient : ClientModInitializer, HudElement {
     val nrDataLoadError: AtomicReference<Pair<NRData?, String?>> = AtomicReference(Pair(null, null))
     val currRoutePair: AtomicReference<Pair<Route, Int>?> = AtomicReference(null)
     var tracker: Tracker? = null
+
+    var fac: Float = 1.0f
 
     init {
         loadJson(false)
@@ -257,6 +261,12 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                         copyBlockCoords(context.source.player.blockPos)
                         context.source.sendFeedback(Text.of("Copied current coordinates to clipboard"))
                         1
+                    }))
+            .then(ClientCommandManager.literal("fac")
+                .then(ClientCommandManager.argument("val", FloatArgumentType.floatArg())
+                    .executes { context ->
+                        fac = FloatArgumentType.getFloat(context, "val")
+                        1
                     })),
             listOf("nr"))
         registerCommand(ClientCommandManager.literal("nrs")
@@ -398,8 +408,11 @@ class NguhroutesClient : ClientModInitializer, HudElement {
             val dx = MathHelper.cos(ty) * (/* MathHelper.sin(tz) * y + */ /* MathHelper.cos(tz) * */ x) - MathHelper.sin(ty) * z
             val dy = MathHelper.sin(tx) * (MathHelper.cos(ty) * z + MathHelper.sin(ty) * (/* MathHelper.sin(tz) * y + */ /* MathHelper.cos(tz) * */ x)) + MathHelper.cos(tx) * (/* MathHelper.cos(tz) * */ y /* + MathHelper.sin(tz) * x */)
 
-            val fov = MinecraftClient.getInstance().options.fov.value / 100.0f * player.getFovMultiplier(true, 1.0f)
-            val scale = context.scaledWindowHeight * 0.5f / fov
+            // Not quite sure what's going on with the fov but this makes it look correct enough
+            val fov1 = MinecraftClient.getInstance().options.fov.value / 100.0f * player.getFovMultiplier(true, 1.0f)
+            val fov2 = fov1 * (1.25f + MathHelper.square(fov1 - 0.3f))
+            val scale = context.scaledWindowHeight * 0.5f / 0.7f / fov2
+            
             val bx = 1.0f / dz * dx * scale + context.scaledWindowWidth / 2.0f
             val by = 1.0f / dz * dy * scale + context.scaledWindowHeight / 2.0f
 
