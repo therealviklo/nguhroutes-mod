@@ -18,7 +18,8 @@ data class Stop(val code: String, val coords: BlockPos, val time: Double? = null
 data class Line(
     val name: String,
     val stops: List<Stop?>, // Kind of a dirty solution but null means impassable/reset
-    val loop: Boolean
+    val loop: Boolean,
+    val colour: Colour?
 )
 data class NetherConnection(val overworldCode: String, val overworldCoords: BlockPos, val netherCode: String, val netherCoords: BlockPos)
 
@@ -31,8 +32,6 @@ class Network(obj: JsonObject) {
         }
     }
 
-//    val version: String = obj.getValue("version").jsonPrimitive.content
-//    val date: String = obj.getValue("date").jsonPrimitive.content
     val lines: Map<String, Line>
     val connections: List<NetherConnection>
     val stationNames: Map<String, List<String>>
@@ -71,7 +70,17 @@ class Network(obj: JsonObject) {
                         stopObj["dist"]?.jsonPrimitive?.doubleOrNull
                     ))
                 }
-                linesMut[lineCode] = Line(lineName, stopsMut, lineObj["loop"]?.jsonPrimitive?.boolean ?: false)
+                val colour = lineObj["color"]?.jsonPrimitive?.content
+                linesMut[lineCode] = Line(
+                    lineName,
+                    stopsMut,
+                    lineObj["loop"]?.jsonPrimitive?.boolean ?: false,
+                    if (colour != null) {
+                        hexcode(colour)
+                    } else {
+                        null
+                    }
+                )
             }
         }
         lines = linesMut

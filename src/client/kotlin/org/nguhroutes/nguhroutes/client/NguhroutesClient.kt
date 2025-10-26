@@ -48,8 +48,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
     val nrDataLoadError: AtomicReference<Pair<NRData?, String?>> = AtomicReference(Pair(null, null))
     val currRoutePair: AtomicReference<Pair<Route, Int>?> = AtomicReference(null)
     var tracker: Tracker? = null
-
-    var fac: Float = 1.0f
+    var waypointsEnabled = true
 
     init {
         loadJson(false)
@@ -261,12 +260,6 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                         copyBlockCoords(context.source.player.blockPos)
                         context.source.sendFeedback(Text.of("Copied current coordinates to clipboard"))
                         1
-                    }))
-            .then(ClientCommandManager.literal("fac")
-                .then(ClientCommandManager.argument("val", FloatArgumentType.floatArg())
-                    .executes { context ->
-                        fac = FloatArgumentType.getFloat(context, "val")
-                        1
                     })),
             listOf("nr"))
         registerCommand(ClientCommandManager.literal("nrs")
@@ -327,6 +320,14 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                 "key.category.nguhroutes"
             )
         )
+        val bindingToggleWaypoints: KeyBinding = KeyBindingHelper.registerKeyBinding(
+            KeyBinding(
+                "key.nguhroutes.toggle_waypoints",
+                InputUtil.Type.KEYSYM,
+                GLFW.GLFW_KEY_UNKNOWN,
+                "key.category.nguhroutes"
+            )
+        )
         ClientTickEvents.END_CLIENT_TICK.register { client ->
             while (bindingStartMeasuring.wasPressed()) {
                 val player = client.player
@@ -359,22 +360,27 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                     player.sendMessage(Text.of("Copied current coordinates to clipboard"), false)
                 }
             }
+            while (bindingToggleWaypoints.wasPressed()) {
+                waypointsEnabled = !waypointsEnabled
+            }
         }
 
         HudElementRegistry.addFirst(Identifier.of("nguhroutes", "bottom"), this)
     }
 
     override fun render(context: DrawContext, tickCounter: RenderTickCounter) {
+        if (!waypointsEnabled) return
+        val nrData = getNRData(null) ?: return
         val currRoutePair = currRoutePair.get() ?: return
         val currRoute = currRoutePair.first
         val currStop = currRoutePair.second
         if (currStop >= currRoute.stops.size) return
-        val colour = 0xFFFFFFFF.toInt()
+        val colour = nrData.network.lines[currRoute.stops[currStop].lineCode]?.colour ?: Colour(0xFFFFFFFF)
         val clientWorld = MinecraftClient.getInstance().player?.clientWorld ?: return
         val fromCoordsDim = currRoute.stops[currStop].fromCoordsDim
         if (fromCoordsDim == null) {
             if (checkPlayerDim(currRoute.stops[currStop].dimension, clientWorld))
-                renderWaypoint(context, currRoute.stops[currStop].coords.toCenterPos(), "Next", "(Approx.)", true, colour, 0xFF)
+                renderWaypoint(context, currRoute.stops[currStop].coords.toCenterPos(), "Next", "(Approx.)", true, colour, 0xFFu)
         } else {
             val fromCoords = fromCoordsDim.first
             val fromDim = fromCoordsDim.second
@@ -385,19 +391,19 @@ class NguhroutesClient : ClientModInitializer, HudElement {
             }
             if (checkPlayerDim(fromDim, clientWorld)) {
                 val text = if (currRoute.stops[currStop].lineName == "Interdimensional transfer") "Next portal" else "Next platform"
-                renderWaypoint(context, fromCoords.toCenterPos(), text, text2, true, colour, 0xFF)
+                renderWaypoint(context, fromCoords.toCenterPos(), text, text2, true, colour, 0xFFu)
             }
             if (checkPlayerDim(currRoute.stops[currStop].dimension, clientWorld))
-                renderWaypoint(context, currRoute.stops[currStop].coords.toCenterPos(), "Next stop", text2, false, colour, 0x7F)
+                renderWaypoint(context, currRoute.stops[currStop].coords.toCenterPos(), "Next stop", text2, false, colour, 0x7Fu)
         }
     }
 
-    private fun renderWaypoint(context: DrawContext, pos: Vec3d, text: String, text2: String?, angled: Boolean, colour: Int, opacity: Int) {
+    private fun renderWaypoint(context: DrawContext, pos: Vec3d, text: String, text2: String?, angled: Boolean, colour: Colour, opacity: UByte) {
         val player = MinecraftClient.getInstance().player ?: return
         val camera = MinecraftClient.getInstance().cameraEntity ?: return
         val matrices = context.matrices
 
-        val colour = (colour and 0x00FFFFFF) or ((opacity and 0xFF) shl 24)
+        val colour = colour.withOpacity(opacity)
 
         val eye = camera.eyePos
         val x = pos.x.toFloat() - eye.x.toFloat()
@@ -421,18 +427,20 @@ class NguhroutesClient : ClientModInitializer, HudElement {
             val bx = 1.0f / dz * dx * scale + context.scaledWindowWidth * 0.5f
             val by = 1.0f / dz * dy * scale + context.scaledWindowHeight * 0.5f
 
+            val colourARGB = colour.argb()
+
             matrices.pushMatrix()
             matrices.translate(bx, by)
             if (angled)
                 matrices.rotate(MathHelper.HALF_PI * 0.5f)
-            context.fill(-5, -5, 5, 5, colour)
+            context.fill(-5, -5, 5, 5, colourARGB)
             matrices.popMatrix()
 
             val tr = MinecraftClient.getInstance().textRenderer
 
             var yBelow = by.toInt() + 10
             fun drawTextBelow(text: String) {
-                context.drawCenteredTextWithShadow(tr, text, bx.toInt(), yBelow, colour)
+                context.drawCenteredTextWithShadow(tr, text, bx.toInt(), yBelow, (opacity.toInt() shl 24) or 0x00FFFFFF)
                 yBelow += tr.fontHeight
             }
 
