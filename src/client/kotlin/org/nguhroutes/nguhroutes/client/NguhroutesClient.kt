@@ -1,7 +1,6 @@
 package org.nguhroutes.nguhroutes.client
 
 import com.mojang.brigadier.CommandDispatcher
-import com.mojang.brigadier.arguments.FloatArgumentType
 import com.mojang.brigadier.arguments.StringArgumentType
 import com.mojang.brigadier.builder.LiteralArgumentBuilder
 import com.mojang.brigadier.context.CommandContext
@@ -16,7 +15,6 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElement
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry
-import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements
 import net.fabricmc.loader.api.FabricLoader
 import net.minecraft.client.MinecraftClient
 import net.minecraft.client.gui.DrawContext
@@ -27,20 +25,19 @@ import net.minecraft.client.util.Clipboard
 import net.minecraft.client.util.InputUtil
 import net.minecraft.client.world.ClientWorld
 import net.minecraft.command.CommandRegistryAccess
+import net.minecraft.text.MutableText
 import net.minecraft.text.Style
 import net.minecraft.text.Text
 import net.minecraft.text.TextColor
 import net.minecraft.util.Formatting
 import net.minecraft.util.Identifier
-import net.minecraft.util.Util
 import net.minecraft.util.math.BlockPos
-import net.minecraft.util.math.ColorHelper
 import net.minecraft.util.math.MathHelper
 import net.minecraft.util.math.Vec3d
 import org.lwjgl.glfw.GLFW
 import java.net.URI
 import java.util.concurrent.atomic.AtomicReference
-import kotlin.math.pow
+import kotlin.collections.get
 
 
 class NguhroutesClient : ClientModInitializer, HudElement {
@@ -144,7 +141,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
             .then(ClientCommandManager.literal("stop")
                 .executes { context ->
                     currRoutePair.set(null)
-                    sendRouteMessage("Cleared route")
+                    sendRouteMessage(Text.of("Cleared route"))
                     1
                 })
             .then(ClientCommandManager.literal("reload")
@@ -163,13 +160,19 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                     if (currRoutePair == null) {
                         context.source.sendError(Text.literal("No active route"))
                     } else {
-                        val jsonData = getNRData(context) ?: return@executes 1
+                        val nrData = getNRData(context) ?: return@executes 1
                         context.source.sendFeedback(Text.literal("Active route:"))
                         for (i in currRoutePair.first.stops.indices) {
                             val stop = currRoutePair.first.stops[i];
-                            val name = jsonData.network.stationNames[stop.code]?.getOrNull(0) ?: stop.code
-                            val text = (if (i == currRoutePair.second) "> " else "") + "$name (${stop.code}, ${stop.lineName})";
-                            context.source.sendFeedback(Text.literal(text))
+                            val name = nrData.network.stationNames[stop.code]?.getOrNull(0) ?: stop.code
+                            var text = Text.literal(if (i == currRoutePair.second) "> " else "")
+                                .append("$name (${stop.code}, ")
+                            val square = getLineColourSquare(stop.lineCode, nrData)
+                            if (square != null) {
+                                text = text.append(square)
+                            }
+                            text = text.append("${stop.lineName})")
+                            context.source.sendFeedback(text)
                         }
                     }
                     1
@@ -589,7 +592,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                 val nextStop = currRoute.stops[currStop + 1]
                 sendNextStopMessage(nextStop)
             } else {
-                sendRouteMessage("Route finished!")
+                sendRouteMessage(Text.of("Route finished!"))
             }
         }
     }
@@ -664,16 +667,35 @@ class NguhroutesClient : ClientModInitializer, HudElement {
     }
 
     private fun sendNextStopMessage(stop: RouteStop, context: CommandContext<FabricClientCommandSource>? = null) {
-        val jsonData = getNRData(context) ?: return
-        val name = jsonData.network.stationNames[stop.code]?.getOrNull(0) ?: stop.code
-        sendRouteMessage("Next: ${name} (${stop.code}, ${stop.lineName})")
+        val nrData = getNRData(context) ?: return
+        val name = nrData.network.stationNames[stop.code]?.getOrNull(0) ?: stop.code
+        var text = Text.literal("Next: $name (${stop.code}, ")
+        val square = getLineColourSquare(stop.lineCode, nrData)
+        if (square != null) {
+            text = text.append(square)
+        }
+        text = text.append("${stop.lineName})")
+        sendRouteMessage(text)
     }
 
-    private fun sendRouteMessage(msg: String) {
+    private fun sendRouteMessage(msg: Text) {
         val player = MinecraftClient.getInstance().player ?: return
-        val text = Text.of(msg)
-        player.sendMessage(text, true)
-        player.sendMessage(text, false)
+        player.sendMessage(msg, true)
+        player.sendMessage(msg, false)
+    }
+
+    /**
+     * Returns a coloured text square with the appropriate line colour. Returns null if it is unable to determine
+     * the colour. If lineCode is null it immediately returns null.
+     */
+    private fun getLineColourSquare(lineCode: String?, nrData: NRData): MutableText? {
+        if (lineCode == null) return null
+        val lineColour = nrData.network.lines[lineCode]?.colour
+        return if (lineColour != null) {
+            Text.literal("■").withColor(lineColour.argb())
+        } else {
+            null
+        }
     }
 
     /**
