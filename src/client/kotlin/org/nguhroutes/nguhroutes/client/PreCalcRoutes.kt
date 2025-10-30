@@ -17,11 +17,6 @@ import kotlin.math.abs
 
 const val supportedRoutesFormatVersion = "1.0"
 
-/**
- * The speed that one travels at on rail, expressed in **seconds per block**.
- */
-const val minecartSpeedFactor: Double = 1.0 / 100.0
-
 data class Connection(
     val station: String,
     val line: String,
@@ -55,21 +50,18 @@ class PreCalcRoutes {
             }
         }
 
+        // The speed that one travels at on rail, expressed in **seconds per block**.
+        // This is calculated by averaging the speeds for line sections in the network, in the for loop below.
+        var minecartSpeedFactor = 0.0
+        // The total distance for the segments used to calculate minecartSpeedFactor, needed for calculating the average
+        var minecartSpeedFactorDistance = 0.0
+        val deferredConnections: MutableList<() -> Unit> = mutableListOf()
         for (line in net.lines) {
             fun addConnections(from: Stop, to: Stop) {
                 addStationIfNecessary(from.code)
                 addStationIfNecessary(to.code)
 
-                val cost: Double = if (to.time != null) {
-                    to.time
-                } else if (to.dist != null) {
-                    to.dist * minecartSpeedFactor
-                } else {
-                    // Use Manhattan distance to approximate the line length
-                    val dist = abs(from.coords.x - to.coords.x) + abs(from.coords.z - to.coords.z)
-                    dist * minecartSpeedFactor
-                }
-                fun addConnection(from: Stop, to: Stop, reverseDirection: Boolean) {
+                fun addConnection(from: Stop, to: Stop, cost: Double, reverseDirection: Boolean) {
                     stations.getValue(from.code).conns.add(
                         CostConnection(
                             Connection(
@@ -83,8 +75,28 @@ class PreCalcRoutes {
                         )
                     )
                 }
-                addConnection(from, to, false)
-                addConnection(to, from, true)
+                fun addBothConnections(from: Stop, to: Stop, cost: Double) {
+                    addConnection(from, to, cost, false)
+                    addConnection(to, from, cost, true)
+                }
+
+                if (to.time != null) {
+                    if (to.dist != null) {
+                        minecartSpeedFactor += to.time
+                        minecartSpeedFactorDistance += to.dist
+                    }
+                    addBothConnections(from, to, to.time)
+                } else if (to.dist != null) {
+                    deferredConnections.add {
+                        addBothConnections(from, to, to.dist * minecartSpeedFactor)
+                    }
+                } else {
+                    // Use Manhattan distance to approximate the line length
+                    val dist = abs(from.coords.x - to.coords.x) + abs(from.coords.z - to.coords.z)
+                    deferredConnections.add {
+                        addBothConnections(from, to, dist * minecartSpeedFactor)
+                    }
+                }
             }
             var firstStop: Stop? = null
             var prevStop: Stop? = null
@@ -100,6 +112,16 @@ class PreCalcRoutes {
             if (line.value.loop && prevStop != null && firstStop != null) {
                 addConnections(prevStop, firstStop)
             }
+        }
+        // Divide to get the average.
+        minecartSpeedFactor /= minecartSpeedFactorDistance
+        if (!minecartSpeedFactor.isFinite() || minecartSpeedFactor == 0.0 || minecartSpeedFactor < 0.0) {
+            // If we get a weird value we just use this approximation
+            minecartSpeedFactor = 1.0 / 100.0
+        }
+        // Add the deferred connections now, when minecartSpeedFactor has been calculated.
+        for (deferredConnection in deferredConnections) {
+            deferredConnection()
         }
 
         // Add Nether connections if applicable
