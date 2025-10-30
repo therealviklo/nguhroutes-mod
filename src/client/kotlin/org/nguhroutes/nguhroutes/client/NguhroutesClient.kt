@@ -388,7 +388,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
             val fromCoords = fromCoordsDim.first
             val fromDim = fromCoordsDim.second
             val text2 = if (currRoute.stops[currStop].reverseDirection) {
-                "(Probably wrong side of the platform)"
+                "(Marker probably at wrong direction)"
             } else {
                 null
             }
