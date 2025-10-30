@@ -459,6 +459,9 @@ class NguhroutesClient : ClientModInitializer, HudElement {
     private fun setRouteWithStart(context: CommandContext<FabricClientCommandSource>, start: String, dest: String) {
         val jsonData = getNRData(context) ?: return
 
+        val start = jsonData.network.getActualCode(start)
+        val dest = jsonData.network.getActualCode(dest)
+
         val route = jsonData.preCalcRoutes.routes[Pair(start, dest)]
         if (route == null) {
             context.source.sendError(Text.literal("Could not find route."))
@@ -472,6 +475,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
 
     private fun setRoute(context: CommandContext<FabricClientCommandSource>, dest: String) {
         val jsonData = getNRData(context) ?: return
+        val dest = jsonData.network.getActualCode(dest)
         Thread {
             val playerPos = context.source?.player?.pos
             if (playerPos == null) {

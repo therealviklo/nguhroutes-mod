@@ -13,7 +13,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import net.minecraft.util.math.BlockPos
 import kotlin.collections.iterator
 
-const val supportedNetworkFormatVersion = "5.0"
+const val supportedNetworkFormatVersion = "5.1"
 
 data class Stop(val code: String, val coords: BlockPos, val time: Double? = null, val dist: Double? = null)
 data class Line(
@@ -36,6 +36,7 @@ class Network(obj: JsonObject) {
     val lines: Map<String, Line>
     val connections: List<NetherConnection>
     val stationNames: Map<String, List<String>>
+    val aliases: Map<String, String>
 
     init {
         val linesObj = obj.getValue("lines").jsonObject
@@ -185,6 +186,16 @@ class Network(obj: JsonObject) {
             }
         }
         stationNames = stationNamesMut
+
+        // Load aliases for station codes
+        val aliasesMut = mutableMapOf<String, String>()
+        val aliasesObj = obj["aliases"]?.jsonObject
+        if (aliasesObj != null) {
+            for (alias in aliasesObj) {
+                aliasesMut[alias.key] = alias.value.jsonPrimitive.content
+            }
+        }
+        aliases = aliasesMut
     }
 
     fun findAverageStationCoords(code: String): BlockPos? {
@@ -212,5 +223,13 @@ class Network(obj: JsonObject) {
     fun findAverageStationCoordsThrowing(code: String): BlockPos {
         return findAverageStationCoords(code)
             ?: throw RuntimeException("Cannot find coordinates for $code")
+    }
+
+    fun getActualCode(code: String): String {
+        return if (aliases.containsKey(code)) {
+            aliases.getValue(code)
+        } else {
+            code
+        }
     }
 }
