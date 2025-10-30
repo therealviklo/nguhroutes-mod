@@ -1,6 +1,7 @@
 package org.nguhroutes.nguhroutes.client
 
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.boolean
@@ -43,7 +44,11 @@ class Network(obj: JsonObject) {
             for (line in dimension.value.jsonArray) {
                 val lineObj = line.jsonObject
                 val lineCode = lineObj.getValue("code").jsonPrimitive.content
-                val lineName = lineObj["name"]?.jsonPrimitive?.content ?: lineCode
+                val lineName = when (val name = lineObj["name"]) {
+                    is JsonPrimitive -> name.content
+                    is JsonArray -> name.getOrNull(0)?.jsonPrimitive?.content ?: lineCode
+                    else -> lineCode
+                }
                 val stops = lineObj.getValue("stops").jsonArray
                 val stopsMut = mutableListOf<Stop?>()
                 for (stop in stops) {
@@ -119,43 +124,59 @@ class Network(obj: JsonObject) {
         if (stationsObj != null) {
             for (station in stationsObj.jsonObject) {
                 val nameList = mutableListOf<String>()
-                when (val names = station.value) {
-                    is JsonArray -> {
-                        for (name in names) {
-                            nameList.add(name.jsonPrimitive.content)
+
+                fun getNameElement(element: JsonElement): JsonElement {
+                    return when (element) {
+                        is JsonArray -> {
+                            element
+                        }
+                        is JsonPrimitive -> {
+                            element
+                        }
+                        is JsonObject -> {
+                            element.getValue("name")
                         }
                     }
+                }
+
+                var stationCode = station.key
+                var nameElement = getNameElement(station.value)
+                // Check if it is a reference to another entry. It deliberately doesn't check if the reference is
+                // another reference because that could cause recursive nightmares.
+                when (nameElement) {
                     is JsonPrimitive -> {
-                        val name = names.content
+                        val name = nameElement.content
                         if (name.startsWith('$')) {
                             val referee = name.substring(1)
-                            when (val names = stationsObj.jsonObject[referee]) {
-                                is JsonArray -> {
-                                    for (name in names) {
-                                        nameList.add(name.jsonPrimitive.content)
-                                    }
-                                }
-                                is JsonPrimitive -> {
-                                    nameList.add(names.content)
-                                }
-                                else -> throw RuntimeException("Station ${station.key} points to ${referee}, which has a name that is neither a string nor an array")
-                            }
-                        } else {
-                            nameList.add(name)
+                            stationCode = referee
+                            nameElement = getNameElement(stationsObj.jsonObject.getValue(referee))
                         }
                     }
-                    else -> throw RuntimeException("Station ${station.key} has a name that is neither a string nor an array")
+                    else -> {}
                 }
+                when (nameElement) {
+                    is JsonPrimitive -> {
+                        nameList.add(nameElement.content)
+                    }
+                    is JsonArray -> {
+                        nameList.addAll(nameElement.map { i ->
+                            when (i) {
+                                is JsonPrimitive -> i.content
+                                else -> throw RuntimeException("$stationCode has a name that is not a string")
+                            }
+                        })
+                    }
+                    else -> throw RuntimeException("$stationCode has a name that is neither a string nor an array")
+                }
+
                 // People might want to search with an ampersand
-                val nameListSize = nameList.size
-                for (i in 0..<nameListSize) {
+                for (i in 0..<nameList.size) {
                     if (nameList[i].contains('⁊')) {
                         nameList.add(nameList[i].replace('⁊', '&'))
                     }
                 }
                 // or with "and"
-                val nameListSize2 = nameList.size
-                for (i in 0..<nameListSize2) {
+                for (i in 0..<nameList.size) {
                     if (nameList[i].contains('&')) {
                         nameList.add(nameList[i].replace("&", "and"))
                     }
