@@ -146,6 +146,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                 })
             .then(ClientCommandManager.literal("reload")
                 .executes { context ->
+                    context.source.sendFeedback(Text.of("Reloading NguhRoutes data..."))
                     loadJson(false, context.source.player)
                     1
                 }
@@ -373,7 +374,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
 
     override fun render(context: DrawContext, tickCounter: RenderTickCounter) {
         if (!waypointsEnabled) return
-        val nrData = getNRData(null) ?: return
+        val nrData = getNRData(null, false) ?: return
         val currRoutePair = currRoutePair.get() ?: return
         val currRoute = currRoutePair.first
         val currStop = currRoutePair.second
@@ -705,10 +706,10 @@ class NguhroutesClient : ClientModInitializer, HudElement {
     /**
      * Gets the NRData and prints a message if it does not exist.
      */
-    private fun getNRData(context: CommandContext<FabricClientCommandSource>? = null): NRData? {
+    private fun getNRData(context: CommandContext<FabricClientCommandSource>? = null, printMessage: Boolean = true): NRData? {
         val nrDataLoadError = nrDataLoadError.get()
         val nrData = nrDataLoadError.first
-        if (nrData == null) {
+        if (nrData == null && printMessage) {
             if (nrDataLoadError.second == null) {
                 val text = Text.of("Data has not loaded yet.")
                 sendError(text, context)
