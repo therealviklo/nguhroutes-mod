@@ -541,7 +541,9 @@ class NguhroutesClient : ClientModInitializer, HudElement {
             fun checkIfWarpIsFaster(code: String, warpCoords: BlockPos) {
                 val route = jsonData.preCalcRoutes.routes[Pair(code, dest)]
                 if (route != null) {
-                    val firstStopCoords = route.conns.getOrNull(0)?.fromCoords ?: return
+                    val firstStopCoords = route.conns.getOrNull(0)?.fromCoords
+                        ?: jsonData.network.findAverageStationCoords(dest)
+                        ?: return
                     // Time is the time it takes for the route, plus the time it takes to walk to the actual station
                     // from the warp, plus 3 seconds as an estimate for typing in and performing the warp
                     val time = route.time + walkTime(warpCoords.toBottomCenterPos(), firstStopCoords) + 3.0
