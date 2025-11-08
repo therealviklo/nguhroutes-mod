@@ -100,7 +100,17 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                 .executes { context ->
                     val container = FabricLoader.getInstance().getModContainer("nguhroutes").orElse(null)
                     val version = container?.metadata?.version?.friendlyString ?: "(unknown version)"
-                    context.source.sendFeedback(Text.literal("NguhRoutes v$version"))
+                    context.source.sendFeedback(
+                        Text.literal("NguhRoutes")
+                        .setStyle(Style.EMPTY
+                            .withItalic(true)
+                            .withBold(true)
+                            .withUnderline(true))
+                        .append(Text.literal(" v$version")
+                            .setStyle(Style.EMPTY
+                                .withItalic(false)
+                                .withBold(true)
+                                .withUnderline(true))))
                     val nrDataLoadError = this@NguhroutesClient.nrDataLoadError.get()
                     val nrData = nrDataLoadError.first
                     val loadError = nrDataLoadError.second
@@ -189,7 +199,10 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                         context.source.sendError(Text.literal("No active route"))
                     } else {
                         val nrData = getNRData(context) ?: return@executes 1
-                        context.source.sendFeedback(Text.literal("Active route:"))
+                        context.source.sendFeedback(Text.literal("Active route:")
+                            .setStyle(Style.EMPTY
+                                .withBold(true)
+                                .withUnderline(true)))
                         for (i in currRoutePair.first.stops.indices) {
                             val stop = currRoutePair.first.stops[i];
                             val name = nrData.network.getNameOrCode(stop.code)
@@ -261,7 +274,10 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                             if (finds.isEmpty()) {
                                 context.source.sendFeedback(Text.of("No search results."))
                             } else {
-                                context.source.sendFeedback(Text.of("Search Results:"))
+                                context.source.sendFeedback(Text.literal("Search Results:")
+                                    .setStyle(Style.EMPTY
+                                        .withBold(true)
+                                        .withUnderline(true)))
                                 for (result in finds) {
                                     context.source.sendFeedback(result)
                                 }
@@ -769,7 +785,10 @@ class NguhroutesClient : ClientModInitializer, HudElement {
         }
         val nrData = getNRData(context) ?: return
 
-        context.source.sendFeedback(Text.literal("All stations in $ngationCode:"))
+        context.source.sendFeedback(Text.literal("All stations in $ngationCode:")
+            .setStyle(Style.EMPTY
+                .withBold(true)
+                .withUnderline(true)))
         val stations = mutableSetOf<String>()
         for (line in nrData.network.lines) {
             for (stop in line.value.stops) {
