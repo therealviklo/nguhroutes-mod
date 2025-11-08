@@ -26,8 +26,6 @@ import net.minecraft.client.util.Clipboard
 import net.minecraft.client.util.InputUtil
 import net.minecraft.client.world.ClientWorld
 import net.minecraft.command.CommandRegistryAccess
-import net.minecraft.command.argument.CoordinateArgument
-import net.minecraft.command.argument.Vec3ArgumentType
 import net.minecraft.text.MutableText
 import net.minecraft.text.Style
 import net.minecraft.text.Text
@@ -204,7 +202,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                                 .withBold(true)
                                 .withUnderline(true)))
                         for (i in currRoutePair.first.stops.indices) {
-                            val stop = currRoutePair.first.stops[i];
+                            val stop = currRoutePair.first.stops[i]
                             val name = nrData.network.getNameOrCode(stop.code)
                             var text = Text.literal(if (i == currRoutePair.second) "> " else "")
                             if (stop.code == null) {
