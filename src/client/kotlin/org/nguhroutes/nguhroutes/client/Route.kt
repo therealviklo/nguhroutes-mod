@@ -4,7 +4,7 @@ import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Vec3d
 
 data class RouteStop(
-    val code: String,
+    val code: String?,
     val coords: BlockPos,
     val dimension: String,
     val lineCode: String?,
@@ -17,18 +17,17 @@ data class RouteStop(
     val reverseDirection: Boolean,
 )
 
-class Route(startCode: String, conns: List<Connection>, network: Network, warpStart: Boolean = false) {
-    val stops: List<RouteStop>
+class Route {
+    val stops: MutableList<RouteStop> = mutableListOf()
 
-    init {
-        val stopsMut = mutableListOf<RouteStop>()
+    constructor(startCode: String, conns: List<Connection>, network: Network, warpStart: Boolean = false) {
         val startCoords: BlockPos = if (conns.isEmpty()) {
             // This is the case for just running there
             network.findAverageStationCoordsThrowing(startCode)
         } else {
             conns[0].fromCoords
         }
-        stopsMut.add(RouteStop(
+        stops.add(RouteStop(
             startCode,
             startCoords,
             getDim(startCode),
@@ -42,7 +41,7 @@ class Route(startCode: String, conns: List<Connection>, network: Network, warpSt
         for (i in conns.indices) {
             val conn = conns[i]
             val coords: BlockPos = conns[i].toCoords
-            stopsMut.add(RouteStop(
+            stops.add(RouteStop(
                 conn.station,
                 coords,
                 getDim(conn.station),
@@ -53,6 +52,18 @@ class Route(startCode: String, conns: List<Connection>, network: Network, warpSt
             ))
             lastDimension = getDim(conn.station)
         }
-        stops = stopsMut
+    }
+
+    // This is for just sprinting to a coordinate
+    constructor(coords: BlockPos, dimension: String) {
+        stops.add(RouteStop(
+            null,
+            coords,
+            dimension,
+            null,
+            "On foot",
+            null,
+            false
+        ))
     }
 }

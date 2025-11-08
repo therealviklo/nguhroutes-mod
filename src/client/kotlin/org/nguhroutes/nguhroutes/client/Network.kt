@@ -232,4 +232,12 @@ class Network(obj: JsonObject) {
             code
         }
     }
+
+    fun getNameOrCode(code: String?): String {
+        return if (code == null) {
+            "Location"
+        } else {
+            stationNames[code]?.getOrNull(0) ?: code
+        }
+    }
 }

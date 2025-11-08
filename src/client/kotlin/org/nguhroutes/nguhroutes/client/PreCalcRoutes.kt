@@ -1,17 +1,6 @@
 package org.nguhroutes.nguhroutes.client
 
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.double
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import net.minecraft.client.MinecraftClient
-import net.minecraft.text.Text
 import net.minecraft.util.math.BlockPos
-import java.lang.System.Logger.Level
-import java.util.logging.Logger
 import kotlin.collections.iterator
 import kotlin.math.abs
 
@@ -30,8 +19,12 @@ data class Connection(
 )
 data class PreCalcRoute(val time: Double, val conns: List<Connection>)
 
+data class CostConnection(val conn: Connection, val cost: Double)
+data class Station(val conns: MutableList<CostConnection>)
+
 class PreCalcRoutes {
     val routes: Map<Pair<String, String>, PreCalcRoute>
+    val stations: Map<String, Station>
 
     /**
      * Generate pre-calculated routes from a Network.
@@ -40,13 +33,11 @@ class PreCalcRoutes {
         val routesMut = HashMap<Pair<String, String>, PreCalcRoute>()
 
         // First, extract lists of which connections exist at each station
-        data class CostConnection(val conn: Connection, val cost: Double)
-        data class Station(val conns: MutableList<CostConnection>)
-        val stations = HashMap<String, Station>()
+        val stationsMut = HashMap<String, Station>()
 
         fun addStationIfNecessary(code: String) {
-            if (!stations.containsKey(code)) {
-                stations[code] = Station(mutableListOf())
+            if (!stationsMut.containsKey(code)) {
+                stationsMut[code] = Station(mutableListOf())
             }
         }
 
@@ -62,7 +53,7 @@ class PreCalcRoutes {
                 addStationIfNecessary(to.code)
 
                 fun addConnection(from: Stop, to: Stop, cost: Double, reverseDirection: Boolean) {
-                    stations.getValue(from.code).conns.add(
+                    stationsMut.getValue(from.code).conns.add(
                         CostConnection(
                             Connection(
                                 to.code,
@@ -130,7 +121,7 @@ class PreCalcRoutes {
                 addStationIfNecessary(connection.overworldCode)
                 addStationIfNecessary(connection.netherCode)
                 fun addConnection(from: String, fromCoords: BlockPos, to: String, toCoords: BlockPos) {
-                    stations.getValue(from).conns.add(
+                    stationsMut.getValue(from).conns.add(
                         CostConnection(
                             Connection(
                                 to,
@@ -166,23 +157,23 @@ class PreCalcRoutes {
         // First connection of route
         val first = HashMap<Pair<String, String>, CostConnection?>()
 
-        for (i in stations) {
-            for (j in stations) {
+        for (i in stationsMut) {
+            for (j in stationsMut) {
                 dist[Pair(i.key, j.key)] = Double.POSITIVE_INFINITY
                 prev[Pair(i.key, j.key)] = null
                 first[Pair(i.key, j.key)] = null
             }
         }
-        for (station in stations) {
+        for (station in stationsMut) {
             for (conn in station.value.conns) {
                 dist[Pair(station.key, conn.conn.station)] = conn.cost
                 prev[Pair(station.key, conn.conn.station)] = Pair(station.key, conn)
                 first[Pair(station.key, conn.conn.station)] = conn
             }
         }
-        for (k in stations) {
-            for (i in stations) {
-                for (j in stations) {
+        for (k in stationsMut) {
+            for (i in stationsMut) {
+                for (j in stationsMut) {
                     val ij = Pair(i.key, j.key)
                     val ik = Pair(i.key, k.key)
                     val kj = Pair(k.key, j.key)
@@ -199,7 +190,7 @@ class PreCalcRoutes {
                     val arriveConn = prev[ik]?.second
                     val departConn = first[kj]
                     val transferExtraCost = if (arriveConn != null && departConn != null) {
-                        walkTime(arriveConn.conn.toCoords.toBottomCenterPos(), departConn.conn.fromCoords)
+                        walkTime(arriveConn.conn.toCoords.toBottomCenterPos(), departConn.conn.fromCoords.toBottomCenterPos())
                     } else {
                         // As far as I understand it, this case can only occur if dik + dkj is infinite,
                         // and in that case it doesn't matter because nothing will be updated anyway.
@@ -218,8 +209,8 @@ class PreCalcRoutes {
             }
         }
         // Path reconstruction
-        for (start in stations) {
-            stationLoop@ for (end in stations) {
+        for (start in stationsMut) {
+            stationLoop@ for (end in stationsMut) {
                 if (prev[Pair(start.key, end.key)] != null) {
                     var currEndCode = end.key
                     val path = mutableListOf<CostConnection>()
@@ -236,6 +227,7 @@ class PreCalcRoutes {
         }
 
         routes = routesMut
+        stations = stationsMut
     }
 
     // Currently this is no longer used but it's probably good to keep around in case we want to do caching.

@@ -1,6 +1,7 @@
 package org.nguhroutes.nguhroutes.client
 
 import com.mojang.brigadier.CommandDispatcher
+import com.mojang.brigadier.arguments.DoubleArgumentType
 import com.mojang.brigadier.arguments.StringArgumentType
 import com.mojang.brigadier.builder.LiteralArgumentBuilder
 import com.mojang.brigadier.context.CommandContext
@@ -25,6 +26,8 @@ import net.minecraft.client.util.Clipboard
 import net.minecraft.client.util.InputUtil
 import net.minecraft.client.world.ClientWorld
 import net.minecraft.command.CommandRegistryAccess
+import net.minecraft.command.argument.CoordinateArgument
+import net.minecraft.command.argument.Vec3ArgumentType
 import net.minecraft.text.MutableText
 import net.minecraft.text.Style
 import net.minecraft.text.Text
@@ -38,6 +41,7 @@ import org.lwjgl.glfw.GLFW
 import java.net.URI
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.collections.get
+import kotlin.collections.iterator
 
 
 class NguhroutesClient : ClientModInitializer, HudElement {
@@ -97,10 +101,10 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                     val container = FabricLoader.getInstance().getModContainer("nguhroutes").orElse(null)
                     val version = container?.metadata?.version?.friendlyString ?: "(unknown version)"
                     context.source.sendFeedback(Text.literal("NguhRoutes v$version"))
-                    val jsonDataLoadError = this@NguhroutesClient.nrDataLoadError.get()
-                    val jsonData = jsonDataLoadError.first
-                    val loadError = jsonDataLoadError.second
-                    if (jsonData!= null) {
+                    val nrDataLoadError = this@NguhroutesClient.nrDataLoadError.get()
+                    val nrData = nrDataLoadError.first
+                    val loadError = nrDataLoadError.second
+                    if (nrData!= null) {
                         context.source.sendFeedback(Text.literal("JSON data has been loaded"))
                     } else if (loadError != null) {
                         context.source.sendFeedback(Text.literal("An error occurred when loading JSON data"))
@@ -117,7 +121,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                 .then(ClientCommandManager.argument("dest", StringArgumentType.string())
                     .executes { context ->
                         val dest = StringArgumentType.getString(context, "dest").uppercase()
-                        setRoute(context, dest)
+                        setRouteFromCurrentPos(context, dest)
                         1
                     })
                 .then(ClientCommandManager.argument("start", StringArgumentType.string())
@@ -127,19 +131,42 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                             val dest = StringArgumentType.getString(context, "dest").uppercase()
                             setRouteWithStart(context, start, dest)
                             1
-                        })))
+                        }))
+                .then(ClientCommandManager.argument("x", DoubleArgumentType.doubleArg())
+                    .then(ClientCommandManager.argument("y", DoubleArgumentType.doubleArg())
+                        .then(ClientCommandManager.argument("z", DoubleArgumentType.doubleArg())
+                            .executes { context ->
+                                val x = DoubleArgumentType.getDouble(context, "x")
+                                val y = DoubleArgumentType.getDouble(context, "y")
+                                val z = DoubleArgumentType.getDouble(context, "z")
+                                setRouteToCoord(context, Vec3d(x, y, z), "overworld")
+                                1
+                            }
+                            .then(ClientCommandManager.literal("nether")
+                                .executes { context ->
+                                    val x = DoubleArgumentType.getDouble(context, "x")
+                                    val y = DoubleArgumentType.getDouble(context, "y")
+                                    val z = DoubleArgumentType.getDouble(context, "z")
+                                    setRouteToCoord(context, Vec3d(x, y, z), "the_nether")
+                                    1
+                                })))))
             .then(ClientCommandManager.literal("restart")
                 .executes { context ->
                     val currRoutePair = currRoutePair.get()
                     if (currRoutePair == null) {
                         context.source.sendError(Text.literal("No active route"))
                     } else {
-                        setRoute(context, currRoutePair.first.stops.last().code)
+                        val last = currRoutePair.first.stops.last()
+                        if (last.code == null) {
+                            setRouteToCoord(context, last.coords.toBottomCenterPos(), last.dimension)
+                        } else {
+                            setRouteFromCurrentPos(context, last.code)
+                        }
                     }
                     1
                 })
             .then(ClientCommandManager.literal("stop")
-                .executes { context ->
+                .executes {
                     currRoutePair.set(null)
                     sendRouteMessage(Text.of("Cleared route"))
                     1
@@ -151,7 +178,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                     1
                 }
                 .then(ClientCommandManager.literal("nonether")
-                    .executes { context ->
+                    .executes {
                         loadJson(true)
                         1
                     }))
@@ -165,9 +192,13 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                         context.source.sendFeedback(Text.literal("Active route:"))
                         for (i in currRoutePair.first.stops.indices) {
                             val stop = currRoutePair.first.stops[i];
-                            val name = nrData.network.stationNames[stop.code]?.getOrNull(0) ?: stop.code
+                            val name = nrData.network.getNameOrCode(stop.code)
                             var text = Text.literal(if (i == currRoutePair.second) "> " else "")
-                                .append("$name (${stop.code}, ")
+                            if (stop.code == null) {
+                                text = text.append("$name (")
+                            } else {
+                                text = text.append("$name (${stop.code}, ")
+                            }
                             val square = getLineColourSquare(stop.lineCode, nrData)
                             if (square != null) {
                                 text = text.append(square)
@@ -187,9 +218,9 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                     }))
             .then(ClientCommandManager.literal("random")
                 .executes { context ->
-                    val jsonData = getNRData(context) ?: return@executes 1
+                    val nrData = getNRData(context) ?: return@executes 1
                     val stations = mutableSetOf<String>()
-                    for (line in jsonData.network.lines) {
+                    for (line in nrData.network.lines) {
                         for (stop in line.value.stops) {
                             if (stop != null) {
                                 stations.add(stop.code)
@@ -197,17 +228,17 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                         }
                     }
                     val selectedStation = stations.random()
-                    setRoute(context, selectedStation)
+                    setRouteFromCurrentPos(context, selectedStation)
                     1
                 })
             .then(ClientCommandManager.literal("search")
                 .then(ClientCommandManager.argument("regex", StringArgumentType.greedyString())
                     .executes { context ->
                         val query = StringArgumentType.getString(context, "regex")
-                        val jsonData = getNRData(context) ?: return@executes 1
+                        val nrData = getNRData(context) ?: return@executes 1
                         Thread {
                             val finds = mutableListOf<Text>()
-                            for (station in jsonData.network.stationNames) {
+                            for (station in nrData.network.stationNames) {
                                 val re = Regex(query, RegexOption.IGNORE_CASE)
                                 var longestNameFind: Text? = null
                                 var longestNameLength = 0
@@ -270,7 +301,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
             .then(ClientCommandManager.argument("dest", StringArgumentType.string())
                 .executes { context ->
                     val dest = StringArgumentType.getString(context, "dest").uppercase()
-                    setRoute(context, dest)
+                    setRouteFromCurrentPos(context, dest)
                     1
                 })
             .then(ClientCommandManager.argument("start", StringArgumentType.string())
@@ -280,7 +311,25 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                         val dest = StringArgumentType.getString(context, "dest").uppercase()
                         setRouteWithStart(context, start, dest)
                         1
-                    })))
+                    }))
+            .then(ClientCommandManager.argument("x", DoubleArgumentType.doubleArg())
+                .then(ClientCommandManager.argument("y", DoubleArgumentType.doubleArg())
+                    .then(ClientCommandManager.argument("z", DoubleArgumentType.doubleArg())
+                        .executes { context ->
+                            val x = DoubleArgumentType.getDouble(context, "x")
+                            val y = DoubleArgumentType.getDouble(context, "y")
+                            val z = DoubleArgumentType.getDouble(context, "z")
+                            setRouteToCoord(context, Vec3d(x, y, z), "overworld")
+                            1
+                        }
+                        .then(ClientCommandManager.literal("nether")
+                            .executes { context ->
+                                val x = DoubleArgumentType.getDouble(context, "x")
+                                val y = DoubleArgumentType.getDouble(context, "y")
+                                val z = DoubleArgumentType.getDouble(context, "z")
+                                setRouteToCoord(context, Vec3d(x, y, z), "the_nether")
+                                1
+                            })))))
         ClientTickEvents.END_WORLD_TICK.register { clientWorld -> tick(clientWorld) }
 
         // Keybinds
@@ -458,25 +507,24 @@ class NguhroutesClient : ClientModInitializer, HudElement {
     }
 
     private fun setRouteWithStart(context: CommandContext<FabricClientCommandSource>, start: String, dest: String) {
-        val jsonData = getNRData(context) ?: return
+        val nrData = getNRData(context) ?: return
 
-        val start = jsonData.network.getActualCode(start)
-        val dest = jsonData.network.getActualCode(dest)
+        val start = nrData.network.getActualCode(start)
+        val dest = nrData.network.getActualCode(dest)
 
-        val route = jsonData.preCalcRoutes.routes[Pair(start, dest)]
+        val route = nrData.preCalcRoutes.routes[Pair(start, dest)]
         if (route == null) {
             context.source.sendError(Text.literal("Could not find route."))
             return
         }
-        val routeObj = Route(start, route.conns, jsonData.network)
-        currRoutePair.set(Pair(routeObj, 0))
+        val routeObj = Route(start, route.conns, nrData.network)
 
-        sendNextStopMessage(routeObj.stops[0], context)
+        setRoute(context, nrData, routeObj, dest)
     }
 
-    private fun setRoute(context: CommandContext<FabricClientCommandSource>, dest: String) {
-        val jsonData = getNRData(context) ?: return
-        val dest = jsonData.network.getActualCode(dest)
+    private fun setRouteFromCurrentPos(context: CommandContext<FabricClientCommandSource>, dest: String) {
+        val nrData = getNRData(context) ?: return
+        val dest = nrData.network.getActualCode(dest)
         Thread {
             val playerPos = context.source?.player?.pos
             if (playerPos == null) {
@@ -484,90 +532,156 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                 return@Thread
             }
 
-            // Find which route is fastest
-            var fastestRoute: PreCalcRoute? = null
-            var fastestRouteStart: String? = null
-            var fastestRouteTime: Double = Double.POSITIVE_INFINITY
-            var stationHasBeenSeen = false
-            for (route in jsonData.preCalcRoutes.routes) {
-                if (route.value.conns.isEmpty())
-                    continue
-                if (route.key.second == dest) {
-                    stationHasBeenSeen = true
-                    if (checkPlayerDim(getDim(route.key.first), context.source.player.clientWorld)) {
-                        val firstStopCoords = route.value.conns.getOrNull(0)?.fromCoords
+            val fastestRouteWithCost = findRouteFromCoords(context, nrData, playerPos, dest)
 
-                        // If we can't determine the coords for the initial stop we can't use that route
-                        if (firstStopCoords == null) {
-                            continue
-                        }
-
-                        // Add the time it takes to sprint to the stop
-                        val time = route.value.time + sprintTime(playerPos, firstStopCoords)
-                        if (time < fastestRouteTime) {
-                            fastestRoute = route.value
-                            fastestRouteStart = route.key.first
-                            fastestRouteTime = time
-                        }
-                    }
-                }
-            }
-
-            if (!stationHasBeenSeen) {
-                if (jsonData.network.stationNames.containsKey(dest)) {
-                    // This is the case for where a station is in the "stations" property in network.jsonc,
-                    // but is not actually anywhere in the network.
-                    context.source.sendError(Text.literal("Could not find route to station \"${dest}\"."))
-                } else {
-                    context.source.sendError(Text.literal("Could not find station \"${dest}\"."))
-                }
-                return@Thread
-            }
-
-            if (checkPlayerDim(getDim(dest), context.source.player.clientWorld)) {
-                // Check if just sprinting there is faster
-                val coords = jsonData.network.findAverageStationCoords(dest)
-                if (coords != null) {
-                    val directTime = sprintTime(playerPos, coords)
-                    if (directTime < fastestRouteTime) {
-                        fastestRoute = PreCalcRoute(0.0, listOf())
-                        fastestRouteStart = dest
-                        fastestRouteTime = directTime
-                    }
-                }
-            }
-
-            var warpStart = false
-            fun checkIfWarpIsFaster(code: String, warpCoords: BlockPos) {
-                val route = jsonData.preCalcRoutes.routes[Pair(code, dest)]
-                if (route != null) {
-                    val firstStopCoords = route.conns.getOrNull(0)?.fromCoords
-                        ?: jsonData.network.findAverageStationCoords(dest)
-                        ?: return
-                    // Time is the time it takes for the route, plus the time it takes to walk to the actual station
-                    // from the warp, plus 3 seconds as an estimate for typing in and performing the warp
-                    val time = route.time + walkTime(warpCoords.toBottomCenterPos(), firstStopCoords) + 3.0
-                    if (time < fastestRouteTime) {
-                        fastestRoute = route
-                        fastestRouteStart = code
-                        fastestRouteTime = time
-                        warpStart = true
-                    }
-                }
-            }
-            checkIfWarpIsFaster("MZS", BlockPos(0, 163, 0))
-            checkIfWarpIsFaster("XG3", BlockPos(-7993, 63, -7994))
-
-            if (fastestRoute == null) {
+            if (fastestRouteWithCost == null) {
                 context.source.sendError(Text.literal("Could not find route."))
                 return@Thread
             }
 
-            val routeObj = Route(fastestRouteStart!!, fastestRoute.conns, jsonData.network, warpStart)
-            currRoutePair.set(Pair(routeObj, 0))
-
-            sendNextStopMessage(routeObj.stops[0], context)
+            setRoute(context, nrData, fastestRouteWithCost.route, dest)
         }.start()
+    }
+
+    private fun setRouteToCoord(context: CommandContext<FabricClientCommandSource>, destCoords: Vec3d, dimension: String) {
+        val nrData = getNRData(context) ?: return
+        Thread {
+            val playerPos = context.source?.player?.pos
+            if (playerPos == null) {
+                context.source.sendError(Text.literal("Could not get player position."))
+                return@Thread
+            }
+
+            context.source.sendFeedback(Text.of("Finding route to coordinate..."))
+
+            var fastestRouteWithCost = RouteWithCost(
+                Route(BlockPos.ofFloored(destCoords), dimension), sprintTime(playerPos, destCoords)
+            )
+            var fastestDestStation: String? = null
+            for (destStation in nrData.preCalcRoutes.stations.keys) {
+                if (getDim(destStation) != dimension) continue
+                val route = findRouteFromCoords(context, nrData, playerPos, destStation) ?: continue
+                val routeFinish = route.route.stops.getOrNull(route.route.stops.size - 1)?.coords?.toBottomCenterPos() ?: continue
+                val cost = route.cost + sprintTime(routeFinish, destCoords)
+                if (fastestRouteWithCost.cost > cost) {
+                    fastestRouteWithCost = RouteWithCost(route.route, cost)
+                    fastestDestStation = destStation
+                }
+            }
+
+            // If fastestDestStation is not null it means that there is an actual route instead of just sprinting there,
+            // and in that case the regular constructor for Route was used, which does not add the final leg on foot,
+            // so it needs to be added here
+            if (fastestDestStation != null) {
+                fastestRouteWithCost.route.stops.add(RouteStop(
+                    null,
+                    BlockPos.ofFloored(destCoords),
+                    getDim(fastestDestStation),
+                    null,
+                    "On foot",
+                    null,
+                    false
+                ))
+            }
+
+            setRoute(context, nrData, fastestRouteWithCost.route, fastestDestStation)
+        }.start()
+    }
+
+    private data class RouteWithCost(val route: Route, val cost: Double)
+
+    private fun findRouteFromCoords(context: CommandContext<FabricClientCommandSource>, nrData: NRData, startCoords: Vec3d, dest: String): RouteWithCost? {
+        // Find which route is fastest
+        var fastestRoute: PreCalcRoute? = null
+        var fastestRouteStart: String? = null
+        var fastestRouteTime: Double = Double.POSITIVE_INFINITY
+        var stationHasBeenSeen = false
+        for (route in nrData.preCalcRoutes.routes) {
+            if (route.value.conns.isEmpty())
+                continue
+            if (route.key.second == dest) {
+                stationHasBeenSeen = true
+                if (checkPlayerDim(getDim(route.key.first), context.source.player.clientWorld)) {
+                    val firstStopCoords = route.value.conns.getOrNull(0)?.fromCoords
+
+                    // If we can't determine the coords for the initial stop we can't use that route
+                    if (firstStopCoords == null) {
+                        continue
+                    }
+
+                    // Add the time it takes to sprint to the stop
+                    val time = route.value.time + sprintTime(startCoords, firstStopCoords.toBottomCenterPos())
+                    if (time < fastestRouteTime) {
+                        fastestRoute = route.value
+                        fastestRouteStart = route.key.first
+                        fastestRouteTime = time
+                    }
+                }
+            }
+        }
+
+        if (!stationHasBeenSeen) {
+            if (nrData.network.stationNames.containsKey(dest)) {
+                // This is the case for where a station is in the "stations" property in network.jsonc,
+                // but is not actually anywhere in the network.
+                context.source.sendError(Text.literal("Could not find route to station \"${dest}\"."))
+            } else {
+                context.source.sendError(Text.literal("Could not find station \"${dest}\"."))
+            }
+            return null
+        }
+
+        if (checkPlayerDim(getDim(dest), context.source.player.clientWorld)) {
+            // Check if just sprinting there is faster
+            val coords = nrData.network.findAverageStationCoords(dest)
+            if (coords != null) {
+                val directTime = sprintTime(startCoords, coords.toBottomCenterPos())
+                if (directTime < fastestRouteTime) {
+                    fastestRoute = PreCalcRoute(0.0, listOf())
+                    fastestRouteStart = dest
+                    fastestRouteTime = directTime
+                }
+            }
+        }
+
+        var warpStart = false
+        fun checkIfWarpIsFaster(code: String, warpCoords: BlockPos) {
+            val route = nrData.preCalcRoutes.routes[Pair(code, dest)]
+            if (route != null) {
+                val firstStopCoords = route.conns.getOrNull(0)?.fromCoords
+                    ?: nrData.network.findAverageStationCoords(dest)
+                    ?: return
+                // Time is the time it takes for the route, plus the time it takes to walk to the actual station
+                // from the warp, plus 3 seconds as an estimate for typing in and performing the warp
+                val time = route.time + walkTime(warpCoords.toBottomCenterPos(), firstStopCoords.toBottomCenterPos()) + 3.0
+                if (time < fastestRouteTime) {
+                    fastestRoute = route
+                    fastestRouteStart = code
+                    fastestRouteTime = time
+                    warpStart = true
+                }
+            }
+        }
+        checkIfWarpIsFaster("MZS", BlockPos(0, 163, 0))
+        checkIfWarpIsFaster("XG3", BlockPos(-7993, 63, -7994))
+
+        return if (fastestRoute == null) {
+            null
+        } else {
+            RouteWithCost(Route(fastestRouteStart!!, fastestRoute.conns, nrData.network, warpStart), fastestRouteTime)
+        }
+    }
+
+    private fun setRoute(context: CommandContext<FabricClientCommandSource>, nrData: NRData, route: Route, dest: String?) {
+        currRoutePair.set(Pair(route, 0))
+        val name = nrData.network.getNameOrCode(dest)
+        val msg = if (dest == null) {
+            "Started route to $name"
+        } else {
+            "Started route to $name ($dest)"
+        }
+        context.source.sendFeedback(Text.of(msg))
+        sendNextStopMessage(route.stops[0], context)
     }
 
     private fun tick(clientWorld: ClientWorld) {
@@ -653,11 +767,11 @@ class NguhroutesClient : ClientModInitializer, HudElement {
             context.source.sendError(Text.literal("This command currently only works with 2-letter codes."))
             return
         }
-        val jsonData = getNRData(context) ?: return
+        val nrData = getNRData(context) ?: return
 
         context.source.sendFeedback(Text.literal("All stations in $ngationCode:"))
         val stations = mutableSetOf<String>()
-        for (line in jsonData.network.lines) {
+        for (line in nrData.network.lines) {
             for (stop in line.value.stops) {
                 if (stop != null) {
                     val code = stop.code
@@ -668,15 +782,19 @@ class NguhroutesClient : ClientModInitializer, HudElement {
             }
         }
         for (station in stations) {
-            val name = jsonData.network.stationNames[station]?.getOrNull(0) ?: station
+            val name = nrData.network.stationNames[station]?.getOrNull(0) ?: station
             context.source.sendFeedback(Text.literal("$name ($station)"))
         }
     }
 
     private fun sendNextStopMessage(stop: RouteStop, context: CommandContext<FabricClientCommandSource>? = null) {
         val nrData = getNRData(context) ?: return
-        val name = nrData.network.stationNames[stop.code]?.getOrNull(0) ?: stop.code
-        var text = Text.literal("Next: $name (${stop.code}, ")
+        val name = nrData.network.getNameOrCode(stop.code)
+        var text = if (stop.code == null) {
+            Text.literal("Next: $name (")
+        } else {
+            Text.literal("Next: $name (${stop.code}, ")
+        }
         val square = getLineColourSquare(stop.lineCode, nrData)
         if (square != null) {
             text = text.append(square)

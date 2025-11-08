@@ -32,22 +32,22 @@ fun distCloser(p: BlockPos, a: BlockPos, b: BlockPos): Boolean {
 /**
  * Calculates the time it takes to move in a straight line from pos to coords, given a speed expressed in seconds per block
  */
-fun moveTime(pos: Vec3d, coords: BlockPos, secondsPerBlock: Double): Double {
-    return sqrt(coords.getSquaredDistance(pos)) * secondsPerBlock
+fun moveTime(a: Vec3d, b: Vec3d, secondsPerBlock: Double): Double {
+    return a.distanceTo(b) * secondsPerBlock
 }
 
 /**
  * Calculates the time it takes to sprint in a straight line from pos to coords
  */
-fun sprintTime(pos: Vec3d, coords: BlockPos): Double {
-    return moveTime(pos, coords, 1 / 5.612)
+fun sprintTime(a: Vec3d, b: Vec3d): Double {
+    return moveTime(a, b, 1 / 5.612)
 }
 
 /**
  * Calculates the time it takes to walk in a straight line from pos to coords
  */
-fun walkTime(pos: Vec3d, coords: BlockPos): Double {
-    return moveTime(pos, coords, 1 / 4.317)
+fun walkTime(a: Vec3d, b: Vec3d): Double {
+    return moveTime(a, b, 1 / 4.317)
 }
 
 /**
