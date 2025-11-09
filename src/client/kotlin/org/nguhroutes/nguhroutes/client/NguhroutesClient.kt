@@ -140,21 +140,21 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                             setRouteWithStart(context, start, dest)
                             1
                         }))
-                .then(ClientCommandManager.argument("x", DoubleArgumentType.doubleArg())
-                    .then(ClientCommandManager.argument("y", DoubleArgumentType.doubleArg())
-                        .then(ClientCommandManager.argument("z", DoubleArgumentType.doubleArg())
+                .then(ClientCommandManager.argument("x", CoordinateArgumentType.coordinate())
+                    .then(ClientCommandManager.argument("y", CoordinateArgumentType.coordinate())
+                        .then(ClientCommandManager.argument("z", CoordinateArgumentType.coordinate())
                             .executes { context ->
-                                val x = DoubleArgumentType.getDouble(context, "x")
-                                val y = DoubleArgumentType.getDouble(context, "y")
-                                val z = DoubleArgumentType.getDouble(context, "z")
+                                val x = CoordinateArgumentType.getCoordinate(context, "x", context.source.player.x)
+                                val y = CoordinateArgumentType.getCoordinate(context, "y", context.source.player.y)
+                                val z = CoordinateArgumentType.getCoordinate(context, "z", context.source.player.z)
                                 setRouteToCoord(context, Vec3d(x, y, z), "overworld")
                                 1
                             }
                             .then(ClientCommandManager.literal("nether")
                                 .executes { context ->
-                                    val x = DoubleArgumentType.getDouble(context, "x")
-                                    val y = DoubleArgumentType.getDouble(context, "y")
-                                    val z = DoubleArgumentType.getDouble(context, "z")
+                                    val x = CoordinateArgumentType.getCoordinate(context, "x", context.source.player.x)
+                                    val y = CoordinateArgumentType.getCoordinate(context, "y", context.source.player.y)
+                                    val z = CoordinateArgumentType.getCoordinate(context, "z", context.source.player.z)
                                     setRouteToCoord(context, Vec3d(x, y, z), "the_nether")
                                     1
                                 })))))
@@ -326,21 +326,21 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                         setRouteWithStart(context, start, dest)
                         1
                     }))
-            .then(ClientCommandManager.argument("x", DoubleArgumentType.doubleArg())
-                .then(ClientCommandManager.argument("y", DoubleArgumentType.doubleArg())
-                    .then(ClientCommandManager.argument("z", DoubleArgumentType.doubleArg())
+            .then(ClientCommandManager.argument("x", CoordinateArgumentType.coordinate())
+                .then(ClientCommandManager.argument("y", CoordinateArgumentType.coordinate())
+                    .then(ClientCommandManager.argument("z", CoordinateArgumentType.coordinate())
                         .executes { context ->
-                            val x = DoubleArgumentType.getDouble(context, "x")
-                            val y = DoubleArgumentType.getDouble(context, "y")
-                            val z = DoubleArgumentType.getDouble(context, "z")
+                            val x = CoordinateArgumentType.getCoordinate(context, "x", context.source.player.x)
+                            val y = CoordinateArgumentType.getCoordinate(context, "y", context.source.player.y)
+                            val z = CoordinateArgumentType.getCoordinate(context, "z", context.source.player.z)
                             setRouteToCoord(context, Vec3d(x, y, z), "overworld")
                             1
                         }
                         .then(ClientCommandManager.literal("nether")
                             .executes { context ->
-                                val x = DoubleArgumentType.getDouble(context, "x")
-                                val y = DoubleArgumentType.getDouble(context, "y")
-                                val z = DoubleArgumentType.getDouble(context, "z")
+                                val x = CoordinateArgumentType.getCoordinate(context, "x", context.source.player.x)
+                                val y = CoordinateArgumentType.getCoordinate(context, "y", context.source.player.y)
+                                val z = CoordinateArgumentType.getCoordinate(context, "z", context.source.player.z)
                                 setRouteToCoord(context, Vec3d(x, y, z), "the_nether")
                                 1
                             })))))
