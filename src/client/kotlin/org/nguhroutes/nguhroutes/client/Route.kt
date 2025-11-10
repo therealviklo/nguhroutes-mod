@@ -21,6 +21,9 @@ class Route {
     val stops: MutableList<RouteStop> = mutableListOf()
 
     constructor(startCode: String, conns: List<Connection>, network: Network, warpStart: Boolean = false) {
+        // Do some preprocessing to get rid of oddities that could maybe occur in the data from PreCalcRoutes
+        val conns = conns.filterIndexed { index, connection -> index == conns.size - 1 || connection.line != "On foot" }
+
         val startCoords: BlockPos = if (conns.isEmpty()) {
             // This is the case for just running there
             network.findAverageStationCoordsThrowing(startCode)

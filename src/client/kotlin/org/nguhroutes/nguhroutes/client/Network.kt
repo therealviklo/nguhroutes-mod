@@ -13,7 +13,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import net.minecraft.util.math.BlockPos
 import kotlin.collections.iterator
 
-const val supportedNetworkFormatVersion = "5.1"
+const val supportedNetworkFormatVersion = "5.2"
 
 data class Stop(val code: String, val coords: BlockPos, val time: Double? = null, val dist: Double? = null)
 data class Line(
@@ -34,6 +34,7 @@ class Network(obj: JsonObject) {
     }
 
     val lines: Map<String, Line>
+    val interchanges: List<Set<String>>
     val connections: List<NetherConnection>
     val stationNames: Map<String, List<String>>
     val aliases: Map<String, String>
@@ -90,6 +91,20 @@ class Network(obj: JsonObject) {
             }
         }
         lines = linesMut
+
+        val interchangesMut = mutableListOf<Set<String>>()
+        val interchangesArr = obj["interchanges"]?.jsonArray
+        if (interchangesArr != null) {
+            for (interchange in interchangesArr) {
+                val interchangeArr = interchange.jsonArray
+                val set = mutableSetOf<String>()
+                for (station in interchangeArr) {
+                    set.add(station.jsonPrimitive.content)
+                }
+                interchangesMut.add(set)
+            }
+        }
+        interchanges = interchangesMut
 
         val connectionsMut = mutableListOf<NetherConnection>()
         val connectionsObject = obj["connections"]

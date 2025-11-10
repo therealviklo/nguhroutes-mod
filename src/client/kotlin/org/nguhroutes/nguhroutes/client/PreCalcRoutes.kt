@@ -9,6 +9,7 @@ const val supportedRoutesFormatVersion = "1.0"
 data class Connection(
     val station: String,
     val line: String,
+    val fromStation: String,
     val fromCoords: BlockPos,
     val toCoords: BlockPos,
     /**
@@ -58,6 +59,7 @@ class PreCalcRoutes {
                             Connection(
                                 to.code,
                                 line.key,
+                                from.code,
                                 from.coords,
                                 to.coords,
                                 reverseDirection
@@ -126,6 +128,7 @@ class PreCalcRoutes {
                             Connection(
                                 to,
                                 "Interdimensional transfer",
+                                from,
                                 fromCoords,
                                 toCoords,
                                 false
@@ -147,6 +150,37 @@ class PreCalcRoutes {
                     connection.overworldCode,
                     connection.overworldCoords
                 )
+            }
+        }
+
+        // For interchange stations, add connections from other stations in the same interchange
+        for (set in net.interchanges) {
+            for (stationCode in set) {
+                val station = stationsMut.getValue(stationCode)
+                for (s2 in set) {
+                    if (stationCode == s2) continue
+                    for (conn in stationsMut.getValue(s2).conns) {
+                        if (conn.conn.fromStation != s2) continue
+                        station.conns.add(conn)
+                    }
+                    // Also, add a direct connection for cases where the trick with adding connections from the other
+                    // station doesn't work properly
+                    val coordsA = net.findAverageStationCoords(stationCode)
+                    val coordsB = net.findAverageStationCoords(s2)
+                    if (coordsA != null && coordsB != null) {
+                        station.conns.add(CostConnection(
+                            Connection(
+                                s2,
+                                "On foot",
+                                stationCode,
+                                coordsA,
+                                coordsB,
+                                false
+                            ),
+                            walkTime(coordsA.toBottomCenterPos(), coordsB.toBottomCenterPos())
+                        ))
+                    }
+                }
             }
         }
 
