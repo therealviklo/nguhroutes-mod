@@ -19,7 +19,9 @@ data class Connection(
     /**
      * This means that the fromCoords and toCoords provided are actually the average coords for that station, and that
      * if possible you should instead use the toCoords from the previous connection for the fromCoords or the fromCoords
-     * for the next connection for the toCoords.
+     * for the next connection for the toCoords. This is mainly intended for interchanges, where it is better to think
+     * of the connection going from the end of the previous connection to the start of the next, but it is hard to know
+     * those coordinates until it is already part of a route.
      */
     val averagedCoords: Boolean = false,
 )
