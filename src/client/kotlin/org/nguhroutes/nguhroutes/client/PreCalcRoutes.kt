@@ -191,6 +191,10 @@ class PreCalcRoutes {
         // First connection of route
         val first = HashMap<Pair<String, String>, CostConnection?>()
 
+
+        // Extra cost for stopping at a station
+        val stationExtraCost = 2.0
+
         for (i in stationsMut) {
             for (j in stationsMut) {
                 dist[Pair(i.key, j.key)] = Double.POSITIVE_INFINITY
@@ -200,7 +204,7 @@ class PreCalcRoutes {
         }
         for (station in stationsMut) {
             for (conn in station.value.conns) {
-                dist[Pair(station.key, conn.conn.station)] = conn.cost
+                dist[Pair(station.key, conn.conn.station)] = conn.cost + stationExtraCost
                 prev[Pair(station.key, conn.conn.station)] = Pair(station.key, conn)
                 first[Pair(station.key, conn.conn.station)] = conn
             }
@@ -215,16 +219,17 @@ class PreCalcRoutes {
                     val dik = dist[ik] ?: Double.POSITIVE_INFINITY
                     val dkj = dist[kj] ?: Double.POSITIVE_INFINITY
 
-                    // Extra cost for stopping at a station
-                    // Maybe this should be applied for direct routes too?
-                    val stationExtraCost = 1.0
-
                     // Extra cost for transferring from one line to another at a station.
                     // Currently, staying on the same line incurs no extra cost since the distance should be zero.
                     val arriveConn = prev[ik]?.second
                     val departConn = first[kj]
                     val transferExtraCost = if (arriveConn != null && departConn != null) {
-                        walkTime(arriveConn.conn.toCoords.toBottomCenterPos(), departConn.conn.fromCoords.toBottomCenterPos())
+                        val wt = walkTime(arriveConn.conn.toCoords.toBottomCenterPos(), departConn.conn.fromCoords.toBottomCenterPos())
+                        if (wt < 1.0) { // Assume that a time of less than 1 seconds means no transfer
+                            wt
+                        } else {
+                            wt + 1.0 // Extra cost for transferring to another line
+                        }
                     } else {
                         // As far as I understand it, this case can only occur if dik + dkj is infinite,
                         // and in that case it doesn't matter because nothing will be updated anyway.
