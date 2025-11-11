@@ -13,7 +13,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import net.minecraft.util.math.BlockPos
 import kotlin.collections.iterator
 
-const val supportedNetworkFormatVersion = "5.2"
+const val supportedNetworkFormatVersion = "6.0"
 
 data class Stop(val code: String, val coords: BlockPos, val time: Double? = null, val dist: Double? = null)
 data class Line(
@@ -121,14 +121,29 @@ class Network(obj: JsonObject) {
                     )
                     return Pair(code, coords)
                 }
-                val overworldEnd = connArr[0].jsonObject
-                val netherEnd = connArr[1].jsonObject
-                val overworldCodeCoords = getConnCodeCoords(overworldEnd)
-                val netherCodeCoords = getConnCodeCoords(netherEnd)
+                val endA = connArr[0].jsonObject
+                val endB = connArr[1].jsonObject
+                val endACodeCoords = getConnCodeCoords(endA)
+                val endBCodeCoords = getConnCodeCoords(endB)
+                val endADim = getDim(endACodeCoords.first)
+                val endBDim = getDim(endBCodeCoords.first)
+                if (endADim == endBDim) {
+                    throw RuntimeException("Nether connection has both ends in the same dimension")
+                }
+                val overworldCodeCoords = if (endADim == "overworld") {
+                    endACodeCoords
+                } else {
+                    endBCodeCoords
+                }
+                val netherCodeCoords = if (endADim == "overworld") {
+                    endBCodeCoords
+                } else {
+                    endACodeCoords
+                }
                 connectionsMut.add(NetherConnection(
                     overworldCodeCoords.first,
                     overworldCodeCoords.second,
-                    prefixes["the_nether"] + netherCodeCoords.first,
+                    netherCodeCoords.first,
                     netherCodeCoords.second)
                 )
             }

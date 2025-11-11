@@ -1,7 +1,6 @@
 package org.nguhroutes.nguhroutes.client
 
 import com.mojang.brigadier.CommandDispatcher
-import com.mojang.brigadier.arguments.DoubleArgumentType
 import com.mojang.brigadier.arguments.StringArgumentType
 import com.mojang.brigadier.builder.LiteralArgumentBuilder
 import com.mojang.brigadier.context.CommandContext
