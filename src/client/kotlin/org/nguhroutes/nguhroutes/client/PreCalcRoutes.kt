@@ -4,7 +4,7 @@ import net.minecraft.util.math.BlockPos
 import kotlin.collections.iterator
 import kotlin.math.abs
 
-const val supportedRoutesFormatVersion = "1.0"
+//const val supportedRoutesFormatVersion = "1.0"
 
 data class Connection(
     val station: String,
@@ -259,7 +259,7 @@ class PreCalcRoutes {
                         currEndCode = newPrev.first
                         path.addFirst(newPrev.second)
                     }
-                    val totalCost = path.fold(0.0, { acc, i -> acc + i.cost })
+                    val totalCost = path.fold(0.0) { acc, i -> acc + i.cost }
                     routesMut[Pair(start.key, end.key)] = PreCalcRoute(totalCost, path.map { conn -> conn.conn })
                 }
             }
