@@ -9,7 +9,6 @@ import kotlin.math.abs
 data class Connection(
     val station: String,
     val line: String,
-    val fromStation: String,
     val fromCoords: BlockPos,
     val toCoords: BlockPos,
     /**
@@ -17,6 +16,12 @@ data class Connection(
      * be a warning that the coords may be inaccurate
      */
     val reverseDirection: Boolean,
+    /**
+     * This means that the fromCoords and toCoords provided are actually the average coords for that station, and that
+     * if possible you should instead use the toCoords from the previous connection for the fromCoords or the fromCoords
+     * for the next connection for the toCoords.
+     */
+    val averagedCoords: Boolean = false,
 )
 data class PreCalcRoute(val time: Double, val conns: List<Connection>)
 
@@ -59,7 +64,6 @@ class PreCalcRoutes {
                             Connection(
                                 to.code,
                                 line.key,
-                                from.code,
                                 from.coords,
                                 to.coords,
                                 reverseDirection
@@ -128,7 +132,6 @@ class PreCalcRoutes {
                             Connection(
                                 to,
                                 "Interdimensional transfer",
-                                from,
                                 fromCoords,
                                 toCoords,
                                 false
@@ -153,18 +156,13 @@ class PreCalcRoutes {
             }
         }
 
-        // For interchange stations, add connections from other stations in the same interchange
+        // For interchanges, add connections between the stations
         for (set in net.interchanges) {
             for (stationCode in set) {
                 val station = stationsMut.getValue(stationCode)
                 for (s2 in set) {
                     if (stationCode == s2) continue
-                    for (conn in stationsMut.getValue(s2).conns) {
-                        if (conn.conn.fromStation != s2) continue
-                        station.conns.add(conn)
-                    }
-                    // Also, add a direct connection for cases where the trick with adding connections from the other
-                    // station doesn't work properly
+
                     val coordsA = net.findAverageStationCoords(stationCode)
                     val coordsB = net.findAverageStationCoords(s2)
                     if (coordsA != null && coordsB != null) {
@@ -172,10 +170,10 @@ class PreCalcRoutes {
                             Connection(
                                 s2,
                                 "On foot",
-                                stationCode,
                                 coordsA,
                                 coordsB,
-                                false
+                                false,
+                                true
                             ),
                             walkTime(coordsA.toBottomCenterPos(), coordsB.toBottomCenterPos())
                         ))
@@ -224,7 +222,23 @@ class PreCalcRoutes {
                     val arriveConn = prev[ik]?.second
                     val departConn = first[kj]
                     val transferExtraCost = if (arriveConn != null && departConn != null) {
-                        val wt = walkTime(arriveConn.conn.toCoords.toBottomCenterPos(), departConn.conn.fromCoords.toBottomCenterPos())
+                        // The toCoords for the arriving connection are usually just the ones provided, but if
+                        // averagedCoords is true, then the toCoords should be the same as the fromCoords for the
+                        // departing connection. Also, if both have averagedCoords as true, I'm not quite sure what
+                        // should happen, so I'll just use the provided ones since that situation should only happen if
+                        // an interchange is specified in a weird way in the network file as far as I can tell.
+                        val toCoords = if (arriveConn.conn.averagedCoords && !departConn.conn.averagedCoords) {
+                            departConn.conn.fromCoords
+                        } else {
+                            arriveConn.conn.toCoords
+                        }
+                        // Vice versa for the fromCoords
+                        val fromCoords = if (departConn.conn.averagedCoords && !arriveConn.conn.averagedCoords) {
+                            departConn.conn.fromCoords
+                        } else {
+                            departConn.conn.fromCoords
+                        }
+                        val wt = walkTime(toCoords.toBottomCenterPos(), fromCoords.toBottomCenterPos())
                         if (wt < 1.0) { // Assume that a time of less than 1 seconds means no transfer
                             wt
                         } else {

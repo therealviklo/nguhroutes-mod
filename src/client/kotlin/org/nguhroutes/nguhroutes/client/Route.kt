@@ -1,7 +1,6 @@
 package org.nguhroutes.nguhroutes.client
 
 import net.minecraft.util.math.BlockPos
-import net.minecraft.util.math.Vec3d
 
 data class RouteStop(
     val code: String?,
@@ -21,9 +20,6 @@ class Route {
     val stops: MutableList<RouteStop> = mutableListOf()
 
     constructor(startCode: String, conns: List<Connection>, network: Network, warpStart: Boolean = false) {
-        // Do some preprocessing to get rid of oddities that could maybe occur in the data from PreCalcRoutes
-        val conns = conns.filterIndexed { index, connection -> index == conns.size - 1 || connection.line != "On foot" }
-
         val startCoords: BlockPos = if (conns.isEmpty()) {
             // This is the case for just running there
             network.findAverageStationCoordsThrowing(startCode)
@@ -43,14 +39,29 @@ class Route {
         var lastDimension = getDim(startCode)
         for (i in conns.indices) {
             val conn = conns[i]
-            val coords: BlockPos = conns[i].toCoords
+            // Get the appropriate coords, depending on if the connection has averagedCoords or not. If averagedCoords
+            // is true, then the appropriate coords are the fromCoords for the next connection, if there is one. Also,
+            // if there are two connections with averagedCoords in a row, just use the provided coords, but that should
+            // rarely happen.
+            val toCoords: BlockPos = if (conn.averagedCoords && i < conns.size - 1 && !conns[i + 1].averagedCoords) {
+                conns[i + 1].fromCoords
+            } else {
+                conn.toCoords
+            }
+            // Really, it should check for averagedCoords here too, but currently that only ever happens if the
+            // connection is on foot, in which case it doesn't matter.
+            val fromCoordsDim = if (conn.line == "On foot") {
+                null
+            } else {
+                Pair(conn.fromCoords, lastDimension)
+            }
             stops.add(RouteStop(
                 conn.station,
-                coords,
+                toCoords,
                 getDim(conn.station),
                 conn.line,
                 network.lines[conn.line]?.name ?: conn.line,
-                Pair(conn.fromCoords, lastDimension),
+                fromCoordsDim,
                 conn.reverseDirection
             ))
             lastDimension = getDim(conn.station)

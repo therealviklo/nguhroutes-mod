@@ -615,22 +615,31 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                 continue
             if (route.key.second == dest) {
                 stationHasBeenSeen = true
-                if (checkPlayerDim(getDim(route.key.first), context.source.player.clientWorld)) {
-                    val firstStopCoords = route.value.conns.getOrNull(0)?.fromCoords
 
-                    // If we can't determine the coords for the initial stop we can't use that route
-                    if (firstStopCoords == null) {
-                        continue
-                    }
-
-                    // Add the time it takes to sprint to the stop
-                    val time = route.value.time + sprintTime(startCoords, firstStopCoords.toBottomCenterPos())
-                    if (time < fastestRouteTime) {
-                        fastestRoute = route.value
-                        fastestRouteStart = route.key.first
-                        fastestRouteTime = time
-                    }
+                if (!checkPlayerDim(getDim(route.key.first), context.source.player.clientWorld)) {
+                    continue
                 }
+
+                val firstStop = route.value.conns.getOrNull(0)
+                // We shouldn't start with a connection on foot
+                if (firstStop?.line == "On foot") {
+                    continue
+                }
+
+                val firstStopCoords = firstStop?.fromCoords
+                // If we can't determine the coords for the initial stop we can't use that route
+                if (firstStopCoords == null) {
+                    continue
+                }
+
+                // Add the time it takes to sprint to the stop
+                val time = route.value.time + sprintTime(startCoords, firstStopCoords.toBottomCenterPos())
+                if (time < fastestRouteTime) {
+                    fastestRoute = route.value
+                    fastestRouteStart = route.key.first
+                    fastestRouteTime = time
+                }
+
             }
         }
 
