@@ -673,9 +673,9 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                 val firstStopCoords = route.conns.getOrNull(0)?.fromCoords
                     ?: nrData.network.findAverageStationCoords(dest)
                     ?: return
-                // Time is the time it takes for the route, plus the time it takes to walk to the actual station
+                // Time is the time it takes for the route, plus the time it takes to sprint to the actual station
                 // from the warp, plus 3 seconds as an estimate for typing in and performing the warp
-                val time = route.time + walkTime(warpCoords.toBottomCenterPos(), firstStopCoords.toBottomCenterPos()) + 3.0
+                val time = route.time + sprintTime(warpCoords.toBottomCenterPos(), firstStopCoords.toBottomCenterPos()) + 3.0
                 if (time < fastestRouteTime) {
                     fastestRoute = route
                     fastestRouteStart = code
