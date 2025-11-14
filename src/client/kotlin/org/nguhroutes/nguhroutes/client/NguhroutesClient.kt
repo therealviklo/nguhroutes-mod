@@ -505,6 +505,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
             val tr = MinecraftClient.getInstance().textRenderer
 
             var yBelow = by.toInt() + 10
+            @Suppress("AssignedValueIsNeverRead")
             fun drawTextBelow(text: String) {
                 context.drawCenteredTextWithShadow(tr, text, bx.toInt(), yBelow, (opacity.toInt() shl 24) or 0x00FFFFFF)
                 yBelow += tr.fontHeight

@@ -2,9 +2,7 @@ package org.nguhroutes.nguhroutes.client
 
 import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Vec3d
-import kotlin.math.round
 import kotlin.math.roundToInt
-import kotlin.math.sqrt
 
 /**
  * Returns true if the distance between a and b is less than dist
