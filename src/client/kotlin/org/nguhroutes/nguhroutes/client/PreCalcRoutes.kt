@@ -11,6 +11,7 @@ data class Connection(
     val line: String,
     val fromCoords: BlockPos,
     val toCoords: BlockPos,
+    val cost: Double,
     /**
      * This means that this connection is not in the direction that the line was surveyed, and that there should thus
      * be a warning that the coords may be inaccurate
@@ -26,9 +27,7 @@ data class Connection(
     val averagedCoords: Boolean = false,
 )
 data class PreCalcRoute(val time: Double, val conns: List<Connection>)
-
-data class CostConnection(val conn: Connection, val cost: Double)
-data class Station(val conns: MutableList<CostConnection>)
+data class Station(val conns: MutableList<Connection>)
 
 class PreCalcRoutes {
     val routes: Map<Pair<String, String>, PreCalcRoute>
@@ -62,15 +61,13 @@ class PreCalcRoutes {
 
                 fun addConnection(from: Stop, to: Stop, cost: Double, reverseDirection: Boolean) {
                     stationsMut.getValue(from.code).conns.add(
-                        CostConnection(
-                            Connection(
-                                to.code,
-                                line.key,
-                                from.coords,
-                                to.coords,
-                                reverseDirection
-                            ),
-                            cost
+                        Connection(
+                            to.code,
+                            line.key,
+                            from.coords,
+                            to.coords,
+                            cost,
+                            reverseDirection
                         )
                     )
                 }
@@ -130,16 +127,14 @@ class PreCalcRoutes {
                 addStationIfNecessary(connection.netherCode)
                 fun addConnection(from: String, fromCoords: BlockPos, to: String, toCoords: BlockPos) {
                     stationsMut.getValue(from).conns.add(
-                        CostConnection(
-                            Connection(
-                                to,
-                                "Interdimensional transfer",
-                                fromCoords,
-                                toCoords,
-                                false
-                            ),
+                        Connection(
+                            to,
+                            "Interdimensional transfer",
+                            fromCoords,
+                            toCoords,
                             // This is the time that you have to stand in a portal
-                            4.0
+                            4.0,
+                            false
                         )
                     )
                 }
@@ -168,17 +163,17 @@ class PreCalcRoutes {
                     val coordsA = net.findAverageStationCoords(stationCode)
                     val coordsB = net.findAverageStationCoords(s2)
                     if (coordsA != null && coordsB != null) {
-                        station.conns.add(CostConnection(
+                        station.conns.add(
                             Connection(
                                 s2,
                                 "On foot",
                                 coordsA,
                                 coordsB,
+                                walkTime(coordsA.toBottomCenterPos(), coordsB.toBottomCenterPos()),
                                 false,
                                 true
-                            ),
-                            walkTime(coordsA.toBottomCenterPos(), coordsB.toBottomCenterPos())
-                        ))
+                            )
+                        )
                     }
                 }
             }
@@ -187,9 +182,9 @@ class PreCalcRoutes {
         // Algorithm is Floyd–Warshall with path reconstruction
         val dist = HashMap<Pair<String, String>, Double>()
         // Penultimate stop for route and final connection
-        val prev = HashMap<Pair<String, String>, Pair<String, CostConnection>?>()
+        val prev = HashMap<Pair<String, String>, Pair<String, Connection>?>()
         // First connection of route
-        val first = HashMap<Pair<String, String>, CostConnection?>()
+        val first = HashMap<Pair<String, String>, Connection?>()
 
 
         // Extra cost for stopping at a station
@@ -204,9 +199,9 @@ class PreCalcRoutes {
         }
         for (station in stationsMut) {
             for (conn in station.value.conns) {
-                dist[Pair(station.key, conn.conn.station)] = conn.cost + stationExtraCost
-                prev[Pair(station.key, conn.conn.station)] = Pair(station.key, conn)
-                first[Pair(station.key, conn.conn.station)] = conn
+                dist[Pair(station.key, conn.station)] = conn.cost + stationExtraCost
+                prev[Pair(station.key, conn.station)] = Pair(station.key, conn)
+                first[Pair(station.key, conn.station)] = conn
             }
         }
         for (k in stationsMut) {
@@ -229,16 +224,16 @@ class PreCalcRoutes {
                         // departing connection. Also, if both have averagedCoords as true, I'm not quite sure what
                         // should happen, so I'll just use the provided ones since that situation should only happen if
                         // an interchange is specified in a weird way in the network file as far as I can tell.
-                        val toCoords = if (arriveConn.conn.averagedCoords && !departConn.conn.averagedCoords) {
-                            departConn.conn.fromCoords
+                        val toCoords = if (arriveConn.averagedCoords && !departConn.averagedCoords) {
+                            departConn.fromCoords
                         } else {
-                            arriveConn.conn.toCoords
+                            arriveConn.toCoords
                         }
                         // Vice versa for the fromCoords
-                        val fromCoords = if (departConn.conn.averagedCoords && !arriveConn.conn.averagedCoords) {
-                            departConn.conn.fromCoords
+                        val fromCoords = if (departConn.averagedCoords && !arriveConn.averagedCoords) {
+                            departConn.fromCoords
                         } else {
-                            departConn.conn.fromCoords
+                            departConn.fromCoords
                         }
                         val wt = walkTime(toCoords.toBottomCenterPos(), fromCoords.toBottomCenterPos())
                         if (wt < 1.0) { // Assume that a time of less than 1 seconds means no transfer
@@ -268,7 +263,7 @@ class PreCalcRoutes {
             stationLoop@ for (end in stationsMut) {
                 if (prev[Pair(start.key, end.key)] != null) {
                     var currEndCode = end.key
-                    val path = mutableListOf<CostConnection>()
+                    val path = mutableListOf<Connection>()
                     while (start.key != currEndCode) {
                         val newPrev = prev[Pair(start.key, currEndCode)]
                             ?: continue@stationLoop
@@ -276,7 +271,7 @@ class PreCalcRoutes {
                         path.addFirst(newPrev.second)
                     }
                     val totalCost = path.fold(0.0) { acc, i -> acc + i.cost }
-                    routesMut[Pair(start.key, end.key)] = PreCalcRoute(totalCost, path.map { conn -> conn.conn })
+                    routesMut[Pair(start.key, end.key)] = PreCalcRoute(totalCost, path)
                 }
             }
         }

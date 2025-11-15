@@ -14,6 +14,8 @@ data class RouteStop(
      * be a warning that the coords may be inaccurate
      */
     val reverseDirection: Boolean,
+    val debugTime: Double? = null,
+    val debugTimeBefore: Double? = null,
 )
 
 class Route {
@@ -62,7 +64,16 @@ class Route {
                 conn.line,
                 network.lines[conn.line]?.name ?: conn.line,
                 fromCoordsDim,
-                conn.reverseDirection
+                conn.reverseDirection,
+                conn.cost,
+                if (i > 0) {
+                    walkTime(
+                        conns[i - 1].toCoords.toBottomCenterPos(),
+                        (fromCoordsDim?.first ?: conn.fromCoords).toBottomCenterPos()
+                    )
+                } else {
+                    null
+                }
             ))
             lastDimension = getDim(conn.station)
         }

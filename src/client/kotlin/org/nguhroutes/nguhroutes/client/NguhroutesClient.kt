@@ -47,6 +47,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
     val currRoutePair: AtomicReference<Pair<Route, Int>?> = AtomicReference(null)
     var tracker: Tracker? = null
     var waypointsEnabled = true
+    var debug = true
 
     init {
         loadJson(false)
@@ -191,32 +192,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                     }))
             .then(ClientCommandManager.literal("route")
                 .executes { context ->
-                    val currRoutePair = currRoutePair.get()
-                    if (currRoutePair == null) {
-                        context.source.sendError(Text.literal("No active route"))
-                    } else {
-                        val nrData = getNRData(context) ?: return@executes 1
-                        context.source.sendFeedback(Text.literal("Active route:")
-                            .setStyle(Style.EMPTY
-                                .withBold(true)
-                                .withUnderline(true)))
-                        for (i in currRoutePair.first.stops.indices) {
-                            val stop = currRoutePair.first.stops[i]
-                            val name = nrData.network.getNameOrCode(stop.code)
-                            var text = Text.literal(if (i == currRoutePair.second) "> " else "")
-                            if (stop.code == null) {
-                                text = text.append("$name (")
-                            } else {
-                                text = text.append("$name (${stop.code}, ")
-                            }
-                            val square = getLineColourSquare(stop.lineCode, nrData)
-                            if (square != null) {
-                                text = text.append(square)
-                            }
-                            text = text.append("${stop.lineName})")
-                            context.source.sendFeedback(text)
-                        }
-                    }
+                    printRoute(context)
                     1
                 })
             .then(ClientCommandManager.literal("stationlist")
@@ -531,6 +507,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
             context.source.sendError(Text.literal("Could not find route."))
             return
         }
+        context.source.sendFeedback(Text.of("Time: %.1f s".format(route.time)))
         val routeObj = Route(start, route.conns, nrData.network)
 
         setRoute(context, nrData, routeObj, dest)
@@ -574,7 +551,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
             var fastestDestStation: String? = null
             for (destStation in nrData.preCalcRoutes.stations.keys) {
                 if (getDim(destStation) != dimension) continue
-                val route = findRouteFromCoords(context, nrData, playerPos, destStation) ?: continue
+                val route = findRouteFromCoords(context, nrData, playerPos, destStation, true) ?: continue
                 val routeFinish = route.route.stops.getOrNull(route.route.stops.size - 1)?.coords?.toBottomCenterPos() ?: continue
                 val cost = route.cost + sprintTime(routeFinish, destCoords)
                 if (fastestRouteWithCost.cost > cost) {
@@ -604,7 +581,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
 
     private data class RouteWithCost(val route: Route, val cost: Double)
 
-    private fun findRouteFromCoords(context: CommandContext<FabricClientCommandSource>, nrData: NRData, startCoords: Vec3d, dest: String): RouteWithCost? {
+    private fun findRouteFromCoords(context: CommandContext<FabricClientCommandSource>, nrData: NRData, startCoords: Vec3d, dest: String, noDebug: Boolean = false): RouteWithCost? {
         // Find which route is fastest
         var fastestRoute: PreCalcRoute? = null
         var fastestRouteStart: String? = null
@@ -639,7 +616,6 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                     fastestRouteStart = route.key.first
                     fastestRouteTime = time
                 }
-
             }
         }
 
@@ -654,6 +630,10 @@ class NguhroutesClient : ClientModInitializer, HudElement {
             return null
         }
 
+        if (debug && !noDebug && fastestRoute != null) {
+            context.source.sendFeedback(Text.of("Fastest regular route is %.1f s, from $fastestRouteStart".format(fastestRouteTime)))
+        }
+
         if (checkPlayerDim(getDim(dest), context.source.player.clientWorld)) {
             // Check if just sprinting there is faster
             val coords = nrData.network.findAverageStationCoords(dest)
@@ -663,12 +643,16 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                     fastestRoute = PreCalcRoute(0.0, listOf())
                     fastestRouteStart = dest
                     fastestRouteTime = directTime
+
+                    if (debug && !noDebug) {
+                        context.source.sendFeedback(Text.of("Sprinting is faster, %.1f s".format(fastestRouteTime)))
+                    }
                 }
             }
         }
 
         var warpStart = false
-        fun checkIfWarpIsFaster(code: String, warpCoords: BlockPos) {
+        fun checkIfWarpIsFaster(code: String, warpCoords: BlockPos, discount: Double) {
             val route = nrData.preCalcRoutes.routes[Pair(code, dest)]
             if (route != null) {
                 val firstStopCoords = route.conns.getOrNull(0)?.fromCoords
@@ -676,7 +660,9 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                     ?: return
                 // Time is the time it takes for the route, plus the time it takes to sprint to the actual station
                 // from the warp, plus 3 seconds as an estimate for typing in and performing the warp
-                val time = route.time + sprintTime(warpCoords.toBottomCenterPos(), firstStopCoords.toBottomCenterPos()) + 3.0
+                val time = route.time + sprintTime(warpCoords.toBottomCenterPos(), firstStopCoords.toBottomCenterPos()) + 3.0 - discount
+                if (debug && !noDebug)
+                    context.source.sendFeedback(Text.of("Warping to $code is %.1f s".format(time)))
                 if (time < fastestRouteTime) {
                     fastestRoute = route
                     fastestRouteStart = code
@@ -685,8 +671,8 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                 }
             }
         }
-        checkIfWarpIsFaster("MZS", BlockPos(0, 163, 0))
-        checkIfWarpIsFaster("XG3", BlockPos(-7993, 63, -7994))
+        checkIfWarpIsFaster("MZS", BlockPos(0, 163, 0), 10.0)
+        checkIfWarpIsFaster("XG3", BlockPos(-7993, 63, -7994), 0.0)
 
         return if (fastestRoute == null) {
             null
@@ -833,6 +819,48 @@ class NguhroutesClient : ClientModInitializer, HudElement {
         val player = MinecraftClient.getInstance().player ?: return
         player.sendMessage(msg, true)
         player.sendMessage(msg, false)
+    }
+
+    private fun printRoute(context: CommandContext<FabricClientCommandSource>) {
+        val currRoutePair = currRoutePair.get()
+        if (currRoutePair == null) {
+            context.source.sendError(Text.literal("No active route"))
+        } else {
+            val nrData = getNRData(context) ?: return
+            context.source.sendFeedback(Text.literal("Active route:")
+                .setStyle(Style.EMPTY
+                    .withBold(true)
+                    .withUnderline(true)))
+            for (i in currRoutePair.first.stops.indices) {
+                val stop = currRoutePair.first.stops[i]
+                val name = nrData.network.getNameOrCode(stop.code)
+                var text = Text.literal(if (i == currRoutePair.second) "> " else "")
+                if (stop.code == null) {
+                    text = text.append("$name (")
+                } else {
+                    text = text.append("$name (${stop.code}, ")
+                }
+                val square = getLineColourSquare(stop.lineCode, nrData)
+                if (square != null) {
+                    text = text.append(square)
+                }
+                text = text.append("${stop.lineName})")
+                if (debug && (stop.debugTime != null || stop.debugTimeBefore != null)) {
+                    text = text.append(" (")
+                    if (stop.debugTime != null) {
+                        text = text.append("%.1f s".format(stop.debugTime))
+                        if (stop.debugTimeBefore != null) {
+                            text = text.append(", ")
+                        }
+                    }
+                    if (stop.debugTimeBefore != null) {
+                        text = text.append("transfer: %.1f s".format(stop.debugTimeBefore))
+                    }
+                    text = text.append(")")
+                }
+                context.source.sendFeedback(text)
+            }
+        }
     }
 
     /**
