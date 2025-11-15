@@ -6,6 +6,9 @@ import kotlin.math.abs
 
 //const val supportedRoutesFormatVersion = "1.0"
 
+// Extra cost for stopping at a station
+const val stationExtraCost = 2.0
+
 data class Connection(
     val station: String,
     val line: String,
@@ -186,10 +189,6 @@ class PreCalcRoutes {
         // First connection of route
         val first = HashMap<Pair<String, String>, Connection?>()
 
-
-        // Extra cost for stopping at a station
-        val stationExtraCost = 2.0
-
         for (i in stationsMut) {
             for (j in stationsMut) {
                 dist[Pair(i.key, j.key)] = Double.POSITIVE_INFINITY
@@ -218,37 +217,7 @@ class PreCalcRoutes {
                     // Currently, staying on the same line incurs no extra cost since the distance should be zero.
                     val arriveConn = prev[ik]?.second
                     val departConn = first[kj]
-                    val transferExtraCost = if (arriveConn != null && departConn != null) {
-                        // The toCoords for the arriving connection are usually just the ones provided, but if
-                        // averagedCoords is true, then the toCoords should be the same as the fromCoords for the
-                        // departing connection. Also, if both have averagedCoords as true, I'm not quite sure what
-                        // should happen, so I'll just use the provided ones since that situation should only happen if
-                        // an interchange is specified in a weird way in the network file as far as I can tell.
-                        val toCoords = if (arriveConn.averagedCoords && !departConn.averagedCoords) {
-                            departConn.fromCoords
-                        } else {
-                            arriveConn.toCoords
-                        }
-                        // Vice versa for the fromCoords
-                        val fromCoords = if (departConn.averagedCoords && !arriveConn.averagedCoords) {
-                            departConn.fromCoords
-                        } else {
-                            departConn.fromCoords
-                        }
-                        val wt = walkTime(toCoords.toBottomCenterPos(), fromCoords.toBottomCenterPos())
-                        if (wt < 1.0) { // Assume that a time of less than 1 seconds means no transfer
-                            wt
-                        } else {
-                            wt + 1.0 // Extra cost for transferring to another line
-                        }
-                    } else {
-                        // As far as I understand it, this case can only occur if dik + dkj is infinite,
-                        // and in that case it doesn't matter because nothing will be updated anyway.
-                        0.0
-                    }
-
-                    // Sum up extra costs
-                    val extraCost = stationExtraCost + transferExtraCost
+                    val extraCost = calcExtraCost(arriveConn, departConn)
 
                     if (dij > dik + dkj + extraCost) {
                         dist[ij] = dik + dkj + extraCost
@@ -270,7 +239,13 @@ class PreCalcRoutes {
                         currEndCode = newPrev.first
                         path.addFirst(newPrev.second)
                     }
-                    val totalCost = path.fold(0.0) { acc, i -> acc + i.cost }
+                    var totalCost = 0.0
+                    for (i in 0..<path.size) {
+                        totalCost += path[i].cost + calcExtraCost(
+                            if (i != 0) path[i - 1] else null,
+                            path[i]
+                        )
+                    }
                     routesMut[Pair(start.key, end.key)] = PreCalcRoute(totalCost, path)
                 }
             }
@@ -319,4 +294,38 @@ class PreCalcRoutes {
 //        }
 //        routes = routesMut
 //    }
+}
+
+fun calcExtraCost(arriveConn: Connection?, departConn: Connection?): Double {
+    val transferExtraCost = if (arriveConn != null && departConn != null) {
+        // The toCoords for the arriving connection are usually just the ones provided, but if
+        // averagedCoords is true, then the toCoords should be the same as the fromCoords for the
+        // departing connection. Also, if both have averagedCoords as true, I'm not quite sure what
+        // should happen, so I'll just use the provided ones since that situation should only happen if
+        // an interchange is specified in a weird way in the network file as far as I can tell.
+        val toCoords = if (arriveConn.averagedCoords && !departConn.averagedCoords) {
+            departConn.fromCoords
+        } else {
+            arriveConn.toCoords
+        }
+        // Vice versa for the fromCoords
+        val fromCoords = if (departConn.averagedCoords && !arriveConn.averagedCoords) {
+            departConn.fromCoords
+        } else {
+            departConn.fromCoords
+        }
+        val wt = walkTime(toCoords.toBottomCenterPos(), fromCoords.toBottomCenterPos())
+        if (wt < 1.0) { // Assume that a time of less than 1 seconds means no transfer
+            wt
+        } else {
+            wt + 1.0 // Extra cost for transferring to another line
+        }
+    } else {
+        // As far as I understand it, this case can only occur if dik + dkj is infinite,
+        // and in that case it doesn't matter because nothing will be updated anyway.
+        0.0
+    }
+
+    // Sum up extra costs
+    return stationExtraCost + transferExtraCost
 }

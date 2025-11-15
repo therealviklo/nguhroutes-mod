@@ -15,7 +15,7 @@ data class RouteStop(
      */
     val reverseDirection: Boolean,
     val debugTime: Double? = null,
-    val debugTimeBefore: Double? = null,
+    val debugExtraTime: Double? = null,
 )
 
 class Route {
@@ -66,14 +66,10 @@ class Route {
                 fromCoordsDim,
                 conn.reverseDirection,
                 conn.cost,
-                if (i > 0) {
-                    walkTime(
-                        conns[i - 1].toCoords.toBottomCenterPos(),
-                        (fromCoordsDim?.first ?: conn.fromCoords).toBottomCenterPos()
-                    )
-                } else {
-                    null
-                }
+                calcExtraCost(
+                    if (i != 0) conns[i - 1] else null,
+                    conn
+                )
             ))
             lastDimension = getDim(conn.station)
         }

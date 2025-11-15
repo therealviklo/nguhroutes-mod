@@ -845,16 +845,16 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                     text = text.append(square)
                 }
                 text = text.append("${stop.lineName})")
-                if (debug && (stop.debugTime != null || stop.debugTimeBefore != null)) {
+                if (debug && (stop.debugTime != null || stop.debugExtraTime != null)) {
                     text = text.append(" (")
                     if (stop.debugTime != null) {
                         text = text.append("%.1f s".format(stop.debugTime))
-                        if (stop.debugTimeBefore != null) {
+                        if (stop.debugExtraTime != null) {
                             text = text.append(", ")
                         }
                     }
-                    if (stop.debugTimeBefore != null) {
-                        text = text.append("transfer: %.1f s".format(stop.debugTimeBefore))
+                    if (stop.debugExtraTime != null) {
+                        text.append("station extra time: %.1f s, other extra time: %.1f s".format(stationExtraCost, stop.debugExtraTime - stationExtraCost))
                     }
                     text = text.append(")")
                 }
