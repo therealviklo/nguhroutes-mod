@@ -109,6 +109,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                                 .withItalic(false)
                                 .withBold(true)
                                 .withUnderline(true))))
+                    context.source.sendFeedback(Text.of("Supported format version: $supportedNetworkFormatVersion"))
                     val nrDataLoadError = this@NguhroutesClient.nrDataLoadError.get()
                     val nrData = nrDataLoadError.first
                     val loadError = nrDataLoadError.second
