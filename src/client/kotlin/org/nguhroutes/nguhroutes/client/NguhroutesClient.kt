@@ -47,7 +47,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
     val currRoutePair: AtomicReference<Pair<Route, Int>?> = AtomicReference(null)
     var tracker: Tracker? = null
     var waypointsEnabled = true
-    var debug = true
+    val config = loadConfig()
 
     init {
         loadJson(false)
@@ -319,7 +319,35 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                                 val z = CoordinateArgumentType.getCoordinate(context, "z", context.source.player.z)
                                 setRouteToCoord(context, Vec3d(x, y, z), "the_nether")
                                 1
-                            })))))
+                            }))))
+            // TODO: better way of doing this
+            .then(ClientCommandManager.literal("config")
+                .then(ClientCommandManager.literal("debug")
+                    .then(ClientCommandManager.literal("true")
+                        .executes {
+                            config.debug = true
+                            config.saveConfig()
+                            1
+                        })
+                    .then(ClientCommandManager.literal("false")
+                        .executes {
+                            config.debug = false
+                            config.saveConfig()
+                            1
+                        }))
+                .then(ClientCommandManager.literal("your_doom")
+                    .then(ClientCommandManager.literal("true")
+                        .executes {
+                            config.your_doom = true
+                            config.saveConfig()
+                            1
+                        })
+                    .then(ClientCommandManager.literal("false")
+                        .executes {
+                            config.your_doom = false
+                            config.saveConfig()
+                            1
+                        }))))
         ClientTickEvents.END_WORLD_TICK.register { clientWorld -> tick(clientWorld) }
 
         // Keybinds
@@ -631,7 +659,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
             return null
         }
 
-        if (debug && !noDebug && fastestRoute != null) {
+        if (config.debug && !noDebug && fastestRoute != null) {
             context.source.sendFeedback(Text.of("Fastest regular route is %.1f s, from $fastestRouteStart".format(fastestRouteTime)))
         }
 
@@ -645,7 +673,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                     fastestRouteStart = dest
                     fastestRouteTime = directTime
 
-                    if (debug && !noDebug) {
+                    if (config.debug && !noDebug) {
                         context.source.sendFeedback(Text.of("Sprinting is faster, %.1f s".format(fastestRouteTime)))
                     }
                 }
@@ -662,7 +690,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                 // Time is the time it takes for the route, plus the time it takes to sprint to the actual station
                 // from the warp, plus 3 seconds as an estimate for typing in and performing the warp
                 val time = route.time + sprintTime(warpCoords.toBottomCenterPos(), firstStopCoords.toBottomCenterPos()) + 3.0 - discount
-                if (debug && !noDebug)
+                if (config.debug && !noDebug)
                     context.source.sendFeedback(Text.of("Warping to $code is %.1f s".format(time)))
                 if (time < fastestRouteTime) {
                     fastestRoute = route
@@ -846,7 +874,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                     text = text.append(square)
                 }
                 text = text.append("${stop.lineName})")
-                if (debug && (stop.debugTime != null || stop.debugExtraTime != null)) {
+                if (config.debug && (stop.debugTime != null || stop.debugExtraTime != null)) {
                     text = text.append(" (")
                     if (stop.debugTime != null) {
                         text = text.append("%.1f s".format(stop.debugTime))
