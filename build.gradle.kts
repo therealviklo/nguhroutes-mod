@@ -5,6 +5,7 @@ plugins {
     kotlin("jvm") version "2.2.20"
     id("fabric-loom") version "1.11-SNAPSHOT"
     id("maven-publish")
+    kotlin("plugin.serialization") version "1.9.10"
 }
 
 version = project.property("mod_version") as String
@@ -60,6 +61,8 @@ dependencies {
 
     modImplementation("net.fabricmc.fabric-api:fabric-api:${project.property("fabric_version")}")
     compileOnly("com.mojang:brigadier:1.0.18")
+
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 }
 
 tasks.processResources {

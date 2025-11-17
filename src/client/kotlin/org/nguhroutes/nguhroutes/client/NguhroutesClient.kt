@@ -285,7 +285,35 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                         copyBlockCoords(context.source.player.blockPos)
                         context.source.sendFeedback(Text.of("Copied current coordinates to clipboard"))
                         1
-                    })),
+                    }))
+            // TODO: better way of doing this
+            .then(ClientCommandManager.literal("config")
+                .then(ClientCommandManager.literal("debug")
+                    .then(ClientCommandManager.literal("true")
+                        .executes {
+                            config.debug = true
+                            config.saveConfig()
+                            1
+                        })
+                    .then(ClientCommandManager.literal("false")
+                        .executes {
+                            config.debug = false
+                            config.saveConfig()
+                            1
+                        }))
+                .then(ClientCommandManager.literal("your_doom")
+                    .then(ClientCommandManager.literal("true")
+                        .executes {
+                            config.your_doom = true
+                            config.saveConfig()
+                            1
+                        })
+                    .then(ClientCommandManager.literal("false")
+                        .executes {
+                            config.your_doom = false
+                            config.saveConfig()
+                            1
+                        }))),
             listOf("nr"))
         registerCommand(ClientCommandManager.literal("nrs")
             .then(ClientCommandManager.argument("dest", StringArgumentType.string())
@@ -319,35 +347,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                                 val z = CoordinateArgumentType.getCoordinate(context, "z", context.source.player.z)
                                 setRouteToCoord(context, Vec3d(x, y, z), "the_nether")
                                 1
-                            }))))
-            // TODO: better way of doing this
-            .then(ClientCommandManager.literal("config")
-                .then(ClientCommandManager.literal("debug")
-                    .then(ClientCommandManager.literal("true")
-                        .executes {
-                            config.debug = true
-                            config.saveConfig()
-                            1
-                        })
-                    .then(ClientCommandManager.literal("false")
-                        .executes {
-                            config.debug = false
-                            config.saveConfig()
-                            1
-                        }))
-                .then(ClientCommandManager.literal("your_doom")
-                    .then(ClientCommandManager.literal("true")
-                        .executes {
-                            config.your_doom = true
-                            config.saveConfig()
-                            1
-                        })
-                    .then(ClientCommandManager.literal("false")
-                        .executes {
-                            config.your_doom = false
-                            config.saveConfig()
-                            1
-                        }))))
+                            })))))
         ClientTickEvents.END_WORLD_TICK.register { clientWorld -> tick(clientWorld) }
 
         // Keybinds
