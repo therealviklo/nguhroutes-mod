@@ -52,12 +52,6 @@ class NguhroutesClient : ClientModInitializer, HudElement {
         loadJson(false)
     }
 
-    private fun downloadJson(url: String): JsonElement {
-        val url = URI(url).toURL()
-        val data = url.openStream().readAllBytes().decodeToString()
-        return Json.parseToJsonElement(data)
-    }
-
     fun loadJson(noNether: Boolean, feedback: ClientPlayerEntity? = null) {
         val nullPair = Pair(null, null)
         nrDataLoadError.set(nullPair)

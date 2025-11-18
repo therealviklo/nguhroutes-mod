@@ -1,7 +1,10 @@
 package org.nguhroutes.nguhroutes.client
 
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Vec3d
+import java.net.URI
 import kotlin.math.roundToInt
 
 /**
@@ -57,4 +60,13 @@ fun prettyDist(dist: Double): String {
     } else {
         String.format("%.1f km", dist / 1000)
     }
+}
+
+/**
+ * Download JSON from a URL
+ */
+fun downloadJson(url: String): JsonElement {
+    val url = URI(url).toURL()
+    val data = url.openStream().readAllBytes().decodeToString()
+    return Json.parseToJsonElement(data)
 }
