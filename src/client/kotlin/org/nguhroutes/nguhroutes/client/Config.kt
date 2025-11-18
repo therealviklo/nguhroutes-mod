@@ -8,14 +8,19 @@ import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource
 import net.fabricmc.loader.api.FabricLoader
 import net.minecraft.client.MinecraftClient
 import net.minecraft.client.option.SimpleOption
+import net.minecraft.text.Style
 import net.minecraft.text.Text
+import net.minecraft.util.Formatting
+import java.util.concurrent.Executors
 import kotlin.io.path.createDirectories
 import kotlin.io.path.div
 import kotlin.io.path.exists
 import kotlin.reflect.KMutableProperty1
 
-val jsonFormat = Json { ignoreUnknownKeys = true }
-val config = loadConfig()
+var config = Config()
+
+private val jsonFormat = Json { ignoreUnknownKeys = true }
+private val executor = Executors.newSingleThreadExecutor()
 
 @Serializable
 class Config {
@@ -32,7 +37,7 @@ class Config {
         }
 
     fun saveConfig() {
-        Thread {
+        executor.submit {
             try {
                 val mcFolder = FabricLoader.getInstance().configDir
                 val configFolder = mcFolder / "nguhroutes"
@@ -45,10 +50,17 @@ class Config {
 
                 val jsonText = jsonFormat.encodeToString(this)
                 configFile.toFile().writeText(jsonText)
+                MinecraftClient.getInstance().player?.sendMessage(Text.of(configFile.toString()), false)
             } catch (e: Exception) {
-                MinecraftClient.getInstance().player?.sendMessage(Text.of(e.message), false)
+                if (debug) {
+                    MinecraftClient.getInstance().player?.sendMessage(
+                        Text.literal("NguhRoutes config error when saving: ${e.message}")
+                            .setStyle(Style.EMPTY.withColor(Formatting.RED)),
+                        false
+                    )
+                }
             }
-        }.start()
+        }
     }
 
     fun configCommand(): LiteralArgumentBuilder<FabricClientCommandSource> {

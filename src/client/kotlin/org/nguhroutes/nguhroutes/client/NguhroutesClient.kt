@@ -91,6 +91,9 @@ class NguhroutesClient : ClientModInitializer, HudElement {
     }
 
     override fun onInitializeClient() {
+        // Load config from file
+        config = loadConfig()
+
         // Commands
         registerCommand(ClientCommandManager.literal("nguhroutes")
             .then(ClientCommandManager.literal("status")
