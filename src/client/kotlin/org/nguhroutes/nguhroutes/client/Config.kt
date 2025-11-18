@@ -16,6 +16,7 @@ import kotlin.io.path.createDirectories
 import kotlin.io.path.div
 import kotlin.io.path.exists
 import kotlin.reflect.KMutableProperty1
+import kotlin.reflect.full.declaredMemberProperties
 
 var config = Config()
 
@@ -86,8 +87,14 @@ class Config {
                     }))
         }
 
-        addBooleanSetting(Config::debug)
-        addBooleanSetting(Config::your_doom)
+        @Suppress("UNCHECKED_CAST")
+        for (field in Config::class.declaredMemberProperties) {
+            when {
+                field.returnType.classifier == Boolean::class -> {
+                    addBooleanSetting(field as KMutableProperty1<Config, Boolean>)
+                }
+            }
+        }
 
         return builder
     }
@@ -99,8 +106,14 @@ class Config {
             options.add(SimpleOption.ofBoolean("key.nguhroutes.${x.name}", x.get(this)) { xNew -> x.set(this, xNew) })
         }
 
-        addBooleanSetting(Config::debug)
-        addBooleanSetting(Config::your_doom)
+        @Suppress("UNCHECKED_CAST")
+        for (field in Config::class.declaredMemberProperties) {
+            when {
+                field.returnType.classifier == Boolean::class -> {
+                    addBooleanSetting(field as KMutableProperty1<Config, Boolean>)
+                }
+            }
+        }
 
         return options
     }
