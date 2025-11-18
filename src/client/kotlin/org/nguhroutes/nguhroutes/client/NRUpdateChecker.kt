@@ -46,6 +46,7 @@ class NRUpdateChecker : UpdateChecker {
 
     private fun latestIsNewer(current: String, latest: String): Boolean {
         fun splitUpdateString(update: String): List<Int> {
+            // Split the sections of the version number, and ignore any letters that come after a number
             return update.split('.').map { it.takeWhile { it.isDigit() }.toInt() }
         }
         val currentSplit = splitUpdateString(current)
