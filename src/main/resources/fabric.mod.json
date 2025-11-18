@@ -18,6 +18,9 @@
     ],
     "main": [
       "org.nguhroutes.nguhroutes.Nguhroutes"
+    ],
+    "modmenu": [
+      "org.nguhroutes.nguhroutes.client.NguhroutesClient"
     ]
   },
   "mixins": [

@@ -4,6 +4,8 @@ import com.mojang.brigadier.CommandDispatcher
 import com.mojang.brigadier.arguments.StringArgumentType
 import com.mojang.brigadier.builder.LiteralArgumentBuilder
 import com.mojang.brigadier.context.CommandContext
+import com.terraformersmc.modmenu.api.ConfigScreenFactory
+import com.terraformersmc.modmenu.api.ModMenuApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonObject
@@ -39,7 +41,7 @@ import java.net.URI
 import java.util.concurrent.atomic.AtomicReference
 
 
-class NguhroutesClient : ClientModInitializer, HudElement {
+class NguhroutesClient : ClientModInitializer, HudElement, ModMenuApi {
     // TODO: nicer way of doing this?
     val nrDataLoadError: AtomicReference<Pair<NRData?, String?>> = AtomicReference(Pair(null, null))
     val currRoutePair: AtomicReference<Pair<Route, Int>?> = AtomicReference(null)
@@ -415,11 +417,17 @@ class NguhroutesClient : ClientModInitializer, HudElement {
             }
             while (bindingConfigScreen.wasPressed()) {
                 val currentScreen = MinecraftClient.getInstance().currentScreen
-                MinecraftClient.getInstance().setScreen(ConfigScreen(currentScreen))
+                MinecraftClient.getInstance().setScreen(ConfigScreen(config, currentScreen))
             }
         }
 
         HudElementRegistry.addFirst(Identifier.of("nguhroutes", "bottom"), this)
+    }
+
+    override fun getModConfigScreenFactory(): ConfigScreenFactory<*> {
+        return ConfigScreenFactory { parent ->
+            ConfigScreen(config, parent)
+        }
     }
 
     override fun render(context: DrawContext, tickCounter: RenderTickCounter) {
