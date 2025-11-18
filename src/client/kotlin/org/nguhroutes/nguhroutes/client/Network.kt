@@ -5,15 +5,17 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.double
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import net.minecraft.util.math.BlockPos
+import net.minecraft.util.math.Vec3d
 import kotlin.collections.iterator
 
-const val supportedNetworkFormatVersion = "6.0"
+const val supportedNetworkFormatVersion = "6.1"
 
 data class Stop(val code: String, val coords: BlockPos, val time: Double? = null, val dist: Double? = null)
 data class Line(
@@ -23,6 +25,7 @@ data class Line(
     val colour: Colour?
 )
 data class NetherConnection(val overworldCode: String, val overworldCoords: BlockPos, val netherCode: String, val netherCoords: BlockPos)
+data class Warp(val code: String, val coords: BlockPos, val discount: Double)
 
 class Network(obj: JsonObject) {
     val format: String = obj.getValue("format").jsonPrimitive.content
@@ -38,6 +41,7 @@ class Network(obj: JsonObject) {
     val connections: List<NetherConnection>
     val stationNames: Map<String, List<String>>
     val aliases: Map<String, String>
+    val warps: List<Warp>
 
     init {
         val linesObj = obj.getValue("lines").jsonObject
@@ -149,6 +153,25 @@ class Network(obj: JsonObject) {
             }
         }
         connections = connectionsMut
+
+        val warpsMut = mutableListOf<Warp>()
+        val warpsObj = obj["warps"]
+        if (warpsObj != null) {
+            for (warp in warpsObj.jsonArray) {
+                val warp = warp.jsonObject
+                val coords = warp.getValue("coords").jsonArray
+                warpsMut.add(Warp(
+                    warp.getValue("code").jsonPrimitive.content,
+                    BlockPos(
+                        coords[0].jsonPrimitive.int,
+                        coords[1].jsonPrimitive.int,
+                        coords[2].jsonPrimitive.int
+                    ),
+                    warp["discount"]?.jsonPrimitive?.double ?: 0.0
+                ))
+            }
+        }
+        warps = warpsMut
 
         val stationNamesMut = mutableMapOf<String, List<String>>()
         val stationsObj = obj.get("stations")

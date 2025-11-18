@@ -683,8 +683,11 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                 }
             }
         }
-        checkIfWarpIsFaster("MZS", BlockPos(0, 163, 0), 10.0)
-        checkIfWarpIsFaster("XG3", BlockPos(-7993, 63, -7994), 0.0)
+        for (warp in nrData.network.warps) {
+            if (!config.your_doom && warp.code == "XYD")
+                continue
+            checkIfWarpIsFaster(warp.code, warp.coords, warp.discount)
+        }
 
         return if (fastestRoute == null) {
             null
