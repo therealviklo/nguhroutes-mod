@@ -37,8 +37,6 @@ import net.minecraft.util.math.Vec3d
 import org.lwjgl.glfw.GLFW
 import java.net.URI
 import java.util.concurrent.atomic.AtomicReference
-import kotlin.collections.get
-import kotlin.collections.iterator
 
 
 class NguhroutesClient : ClientModInitializer, HudElement {
@@ -372,6 +370,14 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                 "key.category.nguhroutes"
             )
         )
+        val bindingConfigScreen: KeyBinding = KeyBindingHelper.registerKeyBinding(
+            KeyBinding(
+                "key.nguhroutes.open_config",
+                InputUtil.Type.KEYSYM,
+                GLFW.GLFW_KEY_UNKNOWN,
+                "key.category.nguhroutes"
+            )
+        )
         ClientTickEvents.END_CLIENT_TICK.register { client ->
             while (bindingStartMeasuring.wasPressed()) {
                 val player = client.player
@@ -406,6 +412,10 @@ class NguhroutesClient : ClientModInitializer, HudElement {
             }
             while (bindingToggleWaypoints.wasPressed()) {
                 waypointsEnabled = !waypointsEnabled
+            }
+            while (bindingConfigScreen.wasPressed()) {
+                val currentScreen = MinecraftClient.getInstance().currentScreen
+                MinecraftClient.getInstance().setScreen(ConfigScreen(currentScreen))
             }
         }
 
