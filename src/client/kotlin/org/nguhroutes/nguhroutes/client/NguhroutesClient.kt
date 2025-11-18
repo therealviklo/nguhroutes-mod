@@ -286,30 +286,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                         context.source.sendFeedback(Text.of("Copied current coordinates to clipboard"))
                         1
                     }))
-            // TODO: better way of doing this
-            .then(ClientCommandManager.literal("config")
-                .then(ClientCommandManager.literal("debug")
-                    .then(ClientCommandManager.literal("true")
-                        .executes {
-                            config.debug = true
-                            1
-                        })
-                    .then(ClientCommandManager.literal("false")
-                        .executes {
-                            config.debug = false
-                            1
-                        }))
-                .then(ClientCommandManager.literal("your_doom")
-                    .then(ClientCommandManager.literal("true")
-                        .executes {
-                            config.your_doom = true
-                            1
-                        })
-                    .then(ClientCommandManager.literal("false")
-                        .executes {
-                            config.your_doom = false
-                            1
-                        }))),
+            .then(config.configCommand()),
             listOf("nr"))
         registerCommand(ClientCommandManager.literal("nrs")
             .then(ClientCommandManager.argument("dest", StringArgumentType.string())
