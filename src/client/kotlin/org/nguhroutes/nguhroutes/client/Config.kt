@@ -7,6 +7,7 @@ import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource
 import net.fabricmc.loader.api.FabricLoader
 import net.minecraft.client.MinecraftClient
+import net.minecraft.client.option.SimpleOption
 import net.minecraft.text.Text
 import kotlin.io.path.createDirectories
 import kotlin.io.path.div
@@ -14,6 +15,7 @@ import kotlin.io.path.exists
 import kotlin.reflect.KMutableProperty1
 
 val jsonFormat = Json { ignoreUnknownKeys = true }
+val config = loadConfig()
 
 @Serializable
 class Config {
@@ -76,6 +78,19 @@ class Config {
         addBooleanSetting(Config::your_doom)
 
         return builder
+    }
+
+    fun screenOptions(): List<SimpleOption<*>> {
+        val options = mutableListOf<SimpleOption<*>>()
+
+        fun addBooleanSetting(x: KMutableProperty1<Config, Boolean>) {
+            options.add(SimpleOption.ofBoolean("key.nguhroutes.${x.name}", x.get(this)) { xNew -> x.set(this, xNew) })
+        }
+
+        addBooleanSetting(Config::debug)
+        addBooleanSetting(Config::your_doom)
+
+        return options
     }
 }
 

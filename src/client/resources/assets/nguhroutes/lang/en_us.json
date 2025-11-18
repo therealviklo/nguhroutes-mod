@@ -6,5 +6,7 @@
   "key.nguhroutes.copy_both_measuring": "Copy measuring JSON (both stops)",
   "key.nguhroutes.copy_coords": "Copy current coordinates",
   "key.nguhroutes.toggle_waypoints": "Toggle waypoints",
-  "key.nguhroutes.open_config": "Open NguhRoutes config"
+  "key.nguhroutes.open_config": "Open NguhRoutes config",
+  "key.nguhroutes.debug": "Debug Mode",
+  "key.nguhroutes.your_doom": "your_doom Warp"
 }

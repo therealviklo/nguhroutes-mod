@@ -41,13 +41,12 @@ import java.net.URI
 import java.util.concurrent.atomic.AtomicReference
 
 
-class NguhroutesClient : ClientModInitializer, HudElement, ModMenuApi {
+class NguhroutesClient : ClientModInitializer, HudElement {
     // TODO: nicer way of doing this?
     val nrDataLoadError: AtomicReference<Pair<NRData?, String?>> = AtomicReference(Pair(null, null))
     val currRoutePair: AtomicReference<Pair<Route, Int>?> = AtomicReference(null)
     var tracker: Tracker? = null
     var waypointsEnabled = true
-    val config = loadConfig()
 
     init {
         loadJson(false)
@@ -422,12 +421,6 @@ class NguhroutesClient : ClientModInitializer, HudElement, ModMenuApi {
         }
 
         HudElementRegistry.addFirst(Identifier.of("nguhroutes", "bottom"), this)
-    }
-
-    override fun getModConfigScreenFactory(): ConfigScreenFactory<*> {
-        return ConfigScreenFactory { parent ->
-            ConfigScreen(config, parent)
-        }
     }
 
     override fun render(context: DrawContext, tickCounter: RenderTickCounter) {

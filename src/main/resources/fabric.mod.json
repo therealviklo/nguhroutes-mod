@@ -20,7 +20,7 @@
       "org.nguhroutes.nguhroutes.Nguhroutes"
     ],
     "modmenu": [
-      "org.nguhroutes.nguhroutes.client.NguhroutesClient"
+      "org.nguhroutes.nguhroutes.client.ModMenuIntegration"
     ]
   },
   "mixins": [
