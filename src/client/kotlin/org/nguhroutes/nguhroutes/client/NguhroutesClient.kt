@@ -292,26 +292,22 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                     .then(ClientCommandManager.literal("true")
                         .executes {
                             config.debug = true
-                            config.saveConfig()
                             1
                         })
                     .then(ClientCommandManager.literal("false")
                         .executes {
                             config.debug = false
-                            config.saveConfig()
                             1
                         }))
                 .then(ClientCommandManager.literal("your_doom")
                     .then(ClientCommandManager.literal("true")
                         .executes {
                             config.your_doom = true
-                            config.saveConfig()
                             1
                         })
                     .then(ClientCommandManager.literal("false")
                         .executes {
                             config.your_doom = false
-                            config.saveConfig()
                             1
                         }))),
             listOf("nr"))

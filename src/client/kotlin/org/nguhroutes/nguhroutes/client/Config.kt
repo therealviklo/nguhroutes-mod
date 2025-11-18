@@ -12,10 +12,19 @@ import kotlin.io.path.exists
 val jsonFormat = Json { ignoreUnknownKeys = true }
 
 @Serializable
-data class Config(
-    var debug: Boolean = false,
-    var your_doom: Boolean = false,
-) {
+class Config {
+    // Add the setter so that it saves automatically when a change is made
+    var debug: Boolean = false
+        set(value) {
+            field = value
+            saveConfig()
+        }
+    var your_doom: Boolean = false
+        set(value) {
+            field = value
+            saveConfig()
+        }
+
     fun saveConfig() {
         Thread {
             try {
