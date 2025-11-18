@@ -49,6 +49,7 @@ repositories {
     // for more information about repositories.
     maven {
         url = uri("https://libraries.minecraft.net")
+        url = uri("https://maven.terraformersmc.com/releases/")
     }
 }
 
@@ -61,6 +62,7 @@ dependencies {
 
     modImplementation("net.fabricmc.fabric-api:fabric-api:${project.property("fabric_version")}")
     compileOnly("com.mojang:brigadier:1.0.18")
+    modApi("com.terraformersmc:modmenu:15.0.0")
 
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 }
