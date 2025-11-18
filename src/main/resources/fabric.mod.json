@@ -5,7 +5,10 @@
   "name": "nguhroutes",
   "description": "Route planning for Cenrail and more",
   "authors": [],
-  "contact": {},
+  "contact": {
+    "homepage": "https://github.com/therealviklo/nguhroutes-mod",
+    "issues": "https://github.com/therealviklo/nguhroutes-mod/issues"
+  },
   "license": "MIT",
   "icon": "assets/nguhroutes/icon.png",
   "environment": "client",
