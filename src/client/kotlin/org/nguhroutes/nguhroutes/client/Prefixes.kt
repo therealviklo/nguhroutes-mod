@@ -19,3 +19,14 @@ fun getPrefix(code: String): String {
     }
     return ""
 }
+
+/**
+ * Adds a prefix to a code if the code doesn't already start with the prefix.
+ */
+fun addPrefix(code: String, prefix: String): String {
+    return if (code.startsWith(prefix)) {
+        code
+    } else {
+        prefix + code
+    }
+}

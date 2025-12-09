@@ -49,7 +49,7 @@ class Network(obj: JsonObject) {
         for (dimension in linesObj) {
             for (line in dimension.value.jsonArray) {
                 val lineObj = line.jsonObject
-                val lineCode = lineObj.getValue("code").jsonPrimitive.content
+                val lineCode = addPrefix(lineObj.getValue("code").jsonPrimitive.content, prefixes.getValue(dimension.key))
                 val lineName = when (val name = lineObj["name"]) {
                     is JsonPrimitive -> name.content
                     is JsonArray -> name.getOrNull(0)?.jsonPrimitive?.content ?: lineCode
@@ -69,7 +69,7 @@ class Network(obj: JsonObject) {
                     }
                     val stopObj = stop.jsonObject
                     val coordsVal = stopObj["coords"] ?: continue
-                    val code = prefixes.getValue(dimension.key) + stopObj.getValue("code").jsonPrimitive.content
+                    val code = addPrefix(stopObj.getValue("code").jsonPrimitive.content, prefixes.getValue(dimension.key))
                     val coords = coordsVal.jsonArray
                     val x = coords[0].jsonPrimitive.int
                     val y = coords[1].jsonPrimitive.int
