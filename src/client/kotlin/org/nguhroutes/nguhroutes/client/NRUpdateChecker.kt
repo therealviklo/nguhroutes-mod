@@ -12,7 +12,7 @@ import kotlin.math.min
  * Update checker for ModMenu
  */
 class NRUpdateChecker : UpdateChecker {
-    private class NRUpdateInfo(val updateNeeded: Boolean, val link: String) : UpdateInfo {
+    class NRUpdateInfo(val updateNeeded: Boolean, val link: String, val latestVersion: String) : UpdateInfo {
         override fun isUpdateAvailable(): Boolean {
             return updateNeeded
         }
@@ -26,7 +26,7 @@ class NRUpdateChecker : UpdateChecker {
         }
     }
 
-    override fun checkForUpdates(): UpdateInfo? {
+    override fun checkForUpdates(): NRUpdateInfo? {
         try {
             val container = FabricLoader.getInstance().getModContainer("nguhroutes").orElse(null)
             val version = container?.metadata?.version?.friendlyString ?: return null
@@ -37,7 +37,8 @@ class NRUpdateChecker : UpdateChecker {
             return NRUpdateInfo(
                 latestIsNewer(version, latestVersion),
                 json["html_url"]?.jsonPrimitive?.content
-                    ?: "https://github.com/therealviklo/nguhroutes-mod/releases/latest"
+                    ?: "https://github.com/therealviklo/nguhroutes-mod/releases/latest",
+                latestVersion
             )
         } catch (_: Exception) {
             return null

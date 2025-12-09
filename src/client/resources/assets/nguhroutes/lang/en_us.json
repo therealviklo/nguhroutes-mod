@@ -8,5 +8,6 @@
   "key.nguhroutes.toggle_waypoints": "Toggle waypoints",
   "key.nguhroutes.open_config": "Open NguhRoutes config",
   "key.nguhroutes.debug": "Debug Mode",
-  "key.nguhroutes.your_doom": "your_doom Warp"
+  "key.nguhroutes.your_doom": "your_doom Warp",
+  "key.nguhroutes.update_notification": "Update Notification"
 }

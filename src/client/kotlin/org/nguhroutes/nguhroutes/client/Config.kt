@@ -36,6 +36,11 @@ class Config {
             field = value
             saveConfig()
         }
+    var update_notification: Boolean = false
+        set(value) {
+            field = value
+            saveConfig()
+        }
 
     fun saveConfig() {
         executor.submit {

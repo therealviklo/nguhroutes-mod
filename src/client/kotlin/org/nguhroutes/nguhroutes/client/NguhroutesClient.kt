@@ -4,10 +4,6 @@ import com.mojang.brigadier.CommandDispatcher
 import com.mojang.brigadier.arguments.StringArgumentType
 import com.mojang.brigadier.builder.LiteralArgumentBuilder
 import com.mojang.brigadier.context.CommandContext
-import com.terraformersmc.modmenu.api.ConfigScreenFactory
-import com.terraformersmc.modmenu.api.ModMenuApi
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonObject
 import net.fabricmc.api.ClientModInitializer
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager
@@ -15,6 +11,7 @@ import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallba
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElement
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry
 import net.fabricmc.loader.api.FabricLoader
@@ -23,10 +20,12 @@ import net.minecraft.client.gui.DrawContext
 import net.minecraft.client.network.ClientPlayerEntity
 import net.minecraft.client.option.KeyBinding
 import net.minecraft.client.render.RenderTickCounter
+import net.minecraft.client.toast.SystemToast
 import net.minecraft.client.util.Clipboard
 import net.minecraft.client.util.InputUtil
 import net.minecraft.client.world.ClientWorld
 import net.minecraft.command.CommandRegistryAccess
+import net.minecraft.text.ClickEvent
 import net.minecraft.text.MutableText
 import net.minecraft.text.Style
 import net.minecraft.text.Text
@@ -37,7 +36,6 @@ import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.MathHelper
 import net.minecraft.util.math.Vec3d
 import org.lwjgl.glfw.GLFW
-import java.net.URI
 import java.util.concurrent.atomic.AtomicReference
 
 
@@ -119,6 +117,10 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                     if (loadError != null) {
                         context.source.sendFeedback(Text.literal("Error:"))
                         context.source.sendError(Text.literal(loadError))
+                    }
+                    // Send an update notification if that is enabled and needed
+                    if (config.update_notification) {
+                        sendUpdateNotificationIfNeeded()
                     }
                     1
                 })
@@ -318,6 +320,11 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                                 1
                             })))))
         ClientTickEvents.END_WORLD_TICK.register { clientWorld -> tick(clientWorld) }
+        ClientPlayConnectionEvents.JOIN.register { _, _, _ ->
+            if (config.update_notification) {
+                sendUpdateNotificationIfNeeded()
+            }
+        }
 
         // Keybinds
         val bindingStartMeasuring: KeyBinding = KeyBindingHelper.registerKeyBinding(
@@ -874,6 +881,55 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                 context.source.sendFeedback(text)
             }
         }
+    }
+
+    private fun sendUpdateNotificationIfNeeded() {
+        Thread {
+            val updateChecker = NRUpdateChecker()
+            val updateInfo = updateChecker.checkForUpdates()
+            if (updateInfo == null || !updateInfo.isUpdateAvailable) {
+                return@Thread
+            }
+
+            val mcc = MinecraftClient.getInstance()
+            mcc.toastManager.add(SystemToast.create(
+                mcc,
+                SystemToast.Type(),
+                Text.literal("New ")
+                    .append(Text.literal("NguhRoutes")
+                        .setStyle(Style.EMPTY
+                            .withItalic(true)
+                            .withBold(true)))
+                    .append(Text.literal(" Update")
+                        .setStyle(Style.EMPTY
+                            .withItalic(false)
+                            .withBold(false))),
+                Text.literal("NguhRoutes")
+                    .setStyle(Style.EMPTY
+                        .withItalic(true)
+                        .withBold(true))
+                    .append(Text.literal(" update ${updateInfo.latestVersion} available!")
+                        .setStyle(Style.EMPTY
+                            .withItalic(false)
+                            .withBold(false)))
+            ))
+            mcc.player?.sendMessage(
+                Text.literal("NguhRoutes")
+                    .setStyle(Style.EMPTY
+                        .withItalic(true)
+                        .withBold(true))
+                    .append(Text.literal(" update ${updateInfo.latestVersion} available! ")
+                        .setStyle(Style.EMPTY
+                            .withItalic(false)
+                            .withBold(false))
+                        .append(Text.literal("Link")
+                            .setStyle(Style.EMPTY
+                                .withClickEvent(ClickEvent.OpenUrl(java.net.URI("https://github.com/therealviklo/nguhroutes-mod/releases/latest")))
+                                .withUnderline(true)
+                                .withColor(Formatting.BLUE)))),
+                false
+            )
+        }.start()
     }
 
     /**
