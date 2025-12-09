@@ -51,7 +51,6 @@ class Config {
 
                 val jsonText = jsonFormat.encodeToString(this)
                 configFile.toFile().writeText(jsonText)
-                MinecraftClient.getInstance().player?.sendMessage(Text.of(configFile.toString()), false)
             } catch (e: Exception) {
                 if (debug) {
                     MinecraftClient.getInstance().player?.sendMessage(
