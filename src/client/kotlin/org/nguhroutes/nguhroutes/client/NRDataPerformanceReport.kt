@@ -43,7 +43,7 @@ class NRDataPerformanceReport {
 
     fun getReport(): List<String> {
         val list = mutableListOf<String>()
-        list.add("Cores: ${Runtime.getRuntime().availableProcessors()}")
+        list.add("Processors: ${Runtime.getRuntime().availableProcessors()}")
         list.add("Download: %.1f s".format(downloadTime.seconds()))
         list.add("Network file parsing: %.1f s".format(networkTime.seconds()))
         list.add("Pre-calculating routes: %.1f s".format(preCalcRoutesTime.seconds()))
