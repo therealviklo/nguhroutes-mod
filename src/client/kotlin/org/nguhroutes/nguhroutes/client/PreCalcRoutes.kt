@@ -6,7 +6,6 @@ import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.collections.iterator
 import kotlin.math.abs
-import kotlin.math.min
 
 //const val supportedRoutesFormatVersion = "1.0"
 
@@ -239,8 +238,13 @@ class PreCalcRoutes {
             for (threadNum in 0..<numThreads) {
                 // Each thread is assigned part of the range of values of i
                 val start = threadNum * threadBlockSize
-                // Clamp the end because the final thread may be dealing with fewer values than the others
-                val end = min(start + threadBlockSize, stationsMut.size)
+                // The final thread may need to handle a bit more than the other threads if stationsMut.size is not
+                // divisible by numThreads
+                val end = if (threadNum == numThreads - 1) {
+                    stationsMut.size
+                } else {
+                    start + threadBlockSize
+                }
                 pool.submit {
                     for (iIndex in start..<end) {
                         val i = stationKeys[iIndex]
