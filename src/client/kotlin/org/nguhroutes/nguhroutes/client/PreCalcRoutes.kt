@@ -1,6 +1,8 @@
 package org.nguhroutes.nguhroutes.client
 
 import net.minecraft.util.math.BlockPos
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.collections.iterator
 import kotlin.math.abs
@@ -230,15 +232,16 @@ class PreCalcRoutes {
         val numThreads = Runtime.getRuntime().availableProcessors()
         /** The size of the range of values of i that one thread deals with */
         val threadBlockSize = stationsMut.size / numThreads
+        val pool = Executors.newFixedThreadPool(numThreads)
         // Main loop
         for (k in stationsMut) {
-            val threads = mutableListOf<Thread>()
+            val numThreadsInProgress = CountDownLatch(numThreads)
             for (threadNum in 0..<numThreads) {
                 // Each thread is assigned part of the range of values of i
                 val start = threadNum * threadBlockSize
                 // Clamp the end because the final thread may be dealing with fewer values than the others
                 val end = min(start + threadBlockSize, stationsMut.size)
-                val thread = Thread {
+                pool.submit {
                     for (iIndex in start..<end) {
                         val i = stationKeys[iIndex]
                         for (j in stationsMut) {
@@ -273,13 +276,10 @@ class PreCalcRoutes {
                             }
                         }
                     }
+                    numThreadsInProgress.countDown()
                 }
-                thread.start()
-                threads.add(thread)
             }
-            for (thread in threads) {
-                thread.join()
-            }
+            numThreadsInProgress.await()
         }
         nrdpr?.pathFindingAlgoMainLoopTime?.stop()
         nrdpr?.pathFindingAlgoPathReconstructionTime?.start()
