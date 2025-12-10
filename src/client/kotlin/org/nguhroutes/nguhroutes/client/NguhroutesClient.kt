@@ -924,7 +924,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                             .withBold(false))
                         .append(Text.literal("Link")
                             .setStyle(Style.EMPTY
-                                .withClickEvent(ClickEvent.OpenUrl(java.net.URI("https://github.com/therealviklo/nguhroutes-mod/releases/latest")))
+                                .withClickEvent(ClickEvent.OpenUrl(java.net.URI(updateInfo.downloadLink)))
                                 .withUnderline(true)
                                 .withColor(Formatting.BLUE)))),
                 false
