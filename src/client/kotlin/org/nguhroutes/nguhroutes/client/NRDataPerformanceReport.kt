@@ -30,16 +30,16 @@ class NRDataPerformanceReport {
 
     val ts = TimeSource.Monotonic
 
-    var downloadTime = Timer(ts)
-    var networkTime = Timer(ts)
-    var preCalcRoutesTime = Timer(ts)
-    var minecartSpeedTime = Timer(ts)
-    var netherConnectionTime = Timer(ts)
-    var interchangesTime = Timer(ts)
-    var pathFindingAlgoTime = Timer(ts)
-    var pathFindingAlgoSetupTime = Timer(ts)
-    var pathFindingAlgoMainLoopTime = Timer(ts)
-    var pathFindingAlgoPathReconstructionTime = Timer(ts)
+    val downloadTime = Timer(ts)
+    val networkTime = Timer(ts)
+    val preCalcRoutesTime = Timer(ts)
+    val minecartSpeedTime = Timer(ts)
+    val netherConnectionTime = Timer(ts)
+    val interchangesTime = Timer(ts)
+    val pathFindingAlgoTime = Timer(ts)
+    val pathFindingAlgoSetupTime = Timer(ts)
+    val pathFindingAlgoMainLoopTime = Timer(ts)
+    val pathFindingAlgoPathReconstructionTime = Timer(ts)
 
     fun getReport(): List<String> {
         val list = mutableListOf<String>()
