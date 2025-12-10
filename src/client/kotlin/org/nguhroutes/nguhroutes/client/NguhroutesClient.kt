@@ -118,10 +118,6 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                         context.source.sendFeedback(Text.literal("Error:"))
                         context.source.sendError(Text.literal(loadError))
                     }
-                    // Send an update notification if that is enabled and needed
-                    if (config.update_notification) {
-                        sendUpdateNotificationIfNeeded()
-                    }
                     1
                 })
             .then(ClientCommandManager.literal("start")
@@ -321,7 +317,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                             })))))
         ClientTickEvents.END_WORLD_TICK.register { clientWorld -> tick(clientWorld) }
         ClientPlayConnectionEvents.JOIN.register { _, _, _ ->
-            if (config.update_notification) {
+            if (config.update_notifications) {
                 sendUpdateNotificationIfNeeded()
             }
         }
