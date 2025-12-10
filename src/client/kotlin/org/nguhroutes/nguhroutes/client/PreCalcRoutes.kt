@@ -39,7 +39,7 @@ class PreCalcRoutes {
     /**
      * Generate pre-calculated routes from a Network.
      */
-    constructor(net: Network, noNether: Boolean) {
+    constructor(net: Network, noNether: Boolean, nrdpr: NRDataPerformanceReport? = null) {
         val routesMut = HashMap<Pair<String, String>, PreCalcRoute>()
 
         // First, extract lists of which connections exist at each station
@@ -51,6 +51,7 @@ class PreCalcRoutes {
             }
         }
 
+        nrdpr?.minecartSpeedTime?.start()
         // The speed that one travels at on rail, expressed in **seconds per block**.
         // This is calculated by averaging the speeds for line sections in the network, in the for loop below.
         var minecartSpeedFactor = 0.0
@@ -122,7 +123,9 @@ class PreCalcRoutes {
         for (deferredConnection in deferredConnections) {
             deferredConnection()
         }
+        nrdpr?.minecartSpeedTime?.stop()
 
+        nrdpr?.netherConnectionTime?.start()
         // Add Nether connections if applicable
         if (!noNether) {
             for (connection in net.connections) {
@@ -155,7 +158,9 @@ class PreCalcRoutes {
                 )
             }
         }
+        nrdpr?.netherConnectionTime?.stop()
 
+        nrdpr?.interchangesTime?.start()
         // For interchanges, add connections between the stations
         for (set in net.interchanges) {
             for (stationCode in set) {
@@ -181,7 +186,10 @@ class PreCalcRoutes {
                 }
             }
         }
+        nrdpr?.interchangesTime?.stop()
 
+        nrdpr?.pathFindingAlgoTime?.start()
+        nrdpr?.pathFindingAlgoSetupTime?.start()
         // Algorithm is Floyd–Warshall with path reconstruction
         val dist = HashMap<Pair<String, String>, Double>()
         // Penultimate stop for route and final connection
@@ -203,6 +211,8 @@ class PreCalcRoutes {
                 first[Pair(station.key, conn.station)] = conn
             }
         }
+        nrdpr?.pathFindingAlgoSetupTime?.stop()
+        nrdpr?.pathFindingAlgoMainLoopTime?.start()
         for (k in stationsMut) {
             for (i in stationsMut) {
                 for (j in stationsMut) {
@@ -227,6 +237,8 @@ class PreCalcRoutes {
                 }
             }
         }
+        nrdpr?.pathFindingAlgoMainLoopTime?.stop()
+        nrdpr?.pathFindingAlgoPathReconstructionTime?.start()
         // Path reconstruction
         for (start in stationsMut) {
             stationLoop@ for (end in stationsMut) {
@@ -250,6 +262,8 @@ class PreCalcRoutes {
                 }
             }
         }
+        nrdpr?.pathFindingAlgoPathReconstructionTime?.stop()
+        nrdpr?.pathFindingAlgoTime?.stop()
 
         routes = routesMut
         stations = stationsMut

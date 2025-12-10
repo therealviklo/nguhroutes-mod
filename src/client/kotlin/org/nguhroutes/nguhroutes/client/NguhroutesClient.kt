@@ -56,11 +56,26 @@ class NguhroutesClient : ClientModInitializer, HudElement {
         currRoutePair.set(null)
         Thread {
             try {
+                val nrdpr = NRDataPerformanceReport()
+
+                nrdpr.downloadTime.start()
                 val networkJson = downloadJson("https://mc.nguh.org/wiki/Data:NguhRoutes/network.json?action=raw")
+                nrdpr.downloadTime.stop()
+
+                nrdpr.networkTime.start()
                 val network = Network(networkJson.jsonObject)
-                val preCalcRoutes = PreCalcRoutes(network, noNether)
+                nrdpr.networkTime.stop()
+
+                nrdpr.preCalcRoutesTime.start()
+                val preCalcRoutes = PreCalcRoutes(network, noNether, nrdpr)
+                nrdpr.preCalcRoutesTime.stop()
+
                 nrDataLoadError.compareAndSet(nullPair, Pair(NRData(network, preCalcRoutes), null))
                 feedback?.sendMessage(Text.of("Finished loading NguhRoutes data!"), false)
+
+                if (feedback != null && config.debug) {
+                    nrdpr.sendReportMessage(feedback)
+                }
             } catch (e: Exception) {
                 nrDataLoadError.compareAndSet(nullPair, Pair(null, e.toString()))
                 if (feedback != null)
