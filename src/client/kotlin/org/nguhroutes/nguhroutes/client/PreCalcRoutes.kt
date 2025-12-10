@@ -1,10 +1,6 @@
 package org.nguhroutes.nguhroutes.client
 
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.sync.withLock
 import net.minecraft.util.math.BlockPos
-import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.collections.iterator
 import kotlin.math.abs
@@ -231,18 +227,28 @@ class PreCalcRoutes {
         val stationKeys = stationsMut.keys.toList()
         nrdpr?.pathFindingAlgoSetupTime?.stop()
         nrdpr?.pathFindingAlgoMainLoopTime?.start()
-        val processors = Runtime.getRuntime().availableProcessors()
-        val processorBlockSize = stationsMut.size / processors
+        val numThreads = Runtime.getRuntime().availableProcessors()
+        /** The size of the range of values of i that one thread deals with */
+        val threadBlockSize = stationsMut.size / numThreads
         // Main loop
         for (k in stationsMut) {
             val threads = mutableListOf<Thread>()
-            for (processor in 0..<processors) {
-                val start = processor * processorBlockSize
-                val end = min(start + processorBlockSize, stationsMut.size)
+            for (threadNum in 0..<numThreads) {
+                // Each thread is assigned part of the range of values of i
+                val start = threadNum * threadBlockSize
+                // Clamp the end because the final thread may be dealing with fewer values than the others
+                val end = min(start + threadBlockSize, stationsMut.size)
                 val thread = Thread {
                     for (iIndex in start..<end) {
                         val i = stationKeys[iIndex]
                         for (j in stationsMut) {
+                            // The fact that there are three reads from pathInfo here shouldn't be a problem because
+                            // only kj can be modified by another thread. The only writes to pathInfo happening at this
+                            // time are to ij (further down), and since the range of values of i is split across the
+                            // threads, only this thread could be modifying paths that have i as the first station. If
+                            // kj has been modified when the read happens, it will as I understand it only be
+                            // beneficial to this thread, in that the thread finds a shorter route earlier than it
+                            // otherwise would have.
                             val ij = pathInfo.getValue(Pair(i    , j.key)).get()
                             val ik = pathInfo.getValue(Pair(i    , k.key)).get()
                             val kj = pathInfo.getValue(Pair(k.key, j.key)).get()
