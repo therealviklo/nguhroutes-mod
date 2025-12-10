@@ -1,8 +1,14 @@
 package org.nguhroutes.nguhroutes.client
 
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.withLock
 import net.minecraft.util.math.BlockPos
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.collections.iterator
 import kotlin.math.abs
+import kotlin.math.min
 
 //const val supportedRoutesFormatVersion = "1.0"
 
@@ -191,48 +197,76 @@ class PreCalcRoutes {
         nrdpr?.pathFindingAlgoTime?.start()
         nrdpr?.pathFindingAlgoSetupTime?.start()
         // Algorithm is Floyd–Warshall with path reconstruction
-        val dist = HashMap<Pair<String, String>, Double>()
-        // Penultimate stop for route and final connection
-        val prev = HashMap<Pair<String, String>, Pair<String, Connection>?>()
-        // First connection of route
-        val first = HashMap<Pair<String, String>, Connection?>()
+        data class FWPathInfo(
+            val dist: Double,
+            /**
+             * Penultimate stop for route and final connection
+             */
+            val prev: Pair<String, Connection>?,
+            /**
+             * First connection of route
+             */
+            val first: Connection?
+        )
+        val pathInfo = HashMap<Pair<String, String>, AtomicReference<FWPathInfo>>()
 
         for (i in stationsMut) {
             for (j in stationsMut) {
-                dist[Pair(i.key, j.key)] = Double.POSITIVE_INFINITY
-                prev[Pair(i.key, j.key)] = null
-                first[Pair(i.key, j.key)] = null
+                pathInfo[Pair(i.key, j.key)] = AtomicReference(FWPathInfo(
+                    Double.POSITIVE_INFINITY,
+                    null,
+                    null
+                ))
             }
         }
         for (station in stationsMut) {
             for (conn in station.value.conns) {
-                dist[Pair(station.key, conn.station)] = conn.cost + stationExtraCost
-                prev[Pair(station.key, conn.station)] = Pair(station.key, conn)
-                first[Pair(station.key, conn.station)] = conn
+                pathInfo.getValue(Pair(station.key, conn.station)).set(FWPathInfo(
+                    conn.cost + stationExtraCost,
+                    Pair(station.key, conn),
+                    conn
+                ))
             }
         }
+        val stationKeys = stationsMut.keys.toList()
         nrdpr?.pathFindingAlgoSetupTime?.stop()
         nrdpr?.pathFindingAlgoMainLoopTime?.start()
+        val processors = Runtime.getRuntime().availableProcessors()
+        val processorBlockSize = stationsMut.size / processors
+        // Main loop
         for (k in stationsMut) {
-            for (i in stationsMut) {
-                for (j in stationsMut) {
-                    val ij = Pair(i.key, j.key)
-                    val ik = Pair(i.key, k.key)
-                    val kj = Pair(k.key, j.key)
-                    val dij = dist[ij] ?: Double.POSITIVE_INFINITY
-                    val dik = dist[ik] ?: Double.POSITIVE_INFINITY
-                    val dkj = dist[kj] ?: Double.POSITIVE_INFINITY
+            runBlocking {
+                for (processor in 0..<processors) {
+                    val start = processor * processorBlockSize
+                    val end = min(start + processorBlockSize, stationsMut.size)
+                    launch {
+                        for (iIndex in start..<end) {
+                            val i = stationKeys[iIndex]
+                            for (j in stationsMut) {
+                                val ij = pathInfo.getValue(Pair(i    , j.key)).get()
+                                val ik = pathInfo.getValue(Pair(i    , k.key)).get()
+                                val kj = pathInfo.getValue(Pair(k.key, j.key)).get()
+                                val dij = ij.dist
+                                val dik = ik.dist
+                                val dkj = kj.dist
 
-                    // Extra cost for transferring from one line to another at a station.
-                    // Currently, staying on the same line incurs no extra cost since the distance should be zero.
-                    val arriveConn = prev[ik]?.second
-                    val departConn = first[kj]
-                    val extraCost = calcExtraCost(arriveConn, departConn)
+                                // Extra cost for transferring from one line to another at a station.
+                                // Currently, staying on the same line incurs no extra cost since the distance should be zero.
+                                val arriveConn = ik.prev?.second
+                                val departConn = kj.first
+                                val extraCost = calcExtraCost(arriveConn, departConn)
 
-                    if (dij > dik + dkj + extraCost) {
-                        dist[ij] = dik + dkj + extraCost
-                        prev[ij] = prev[kj]
-                        first[ij] = first[ik]
+                                if (dij > dik + dkj + extraCost) {
+                                    pathInfo.getValue(Pair(i, j.key)).set(
+                                        FWPathInfo(
+                                            dik + dkj + extraCost,
+                                            kj.prev,
+                                            ik.first
+                                        )
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -242,11 +276,11 @@ class PreCalcRoutes {
         // Path reconstruction
         for (start in stationsMut) {
             stationLoop@ for (end in stationsMut) {
-                if (prev[Pair(start.key, end.key)] != null) {
+                if (pathInfo.getValue(Pair(start.key, end.key)).get().prev != null) {
                     var currEndCode = end.key
                     val path = mutableListOf<Connection>()
                     while (start.key != currEndCode) {
-                        val newPrev = prev[Pair(start.key, currEndCode)]
+                        val newPrev = pathInfo.getValue(Pair(start.key, currEndCode)).get().prev
                             ?: continue@stationLoop
                         currEndCode = newPrev.first
                         path.addFirst(newPrev.second)

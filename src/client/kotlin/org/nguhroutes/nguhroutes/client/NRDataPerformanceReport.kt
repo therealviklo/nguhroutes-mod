@@ -43,16 +43,17 @@ class NRDataPerformanceReport {
 
     fun getReport(): List<String> {
         val list = mutableListOf<String>()
+        list.add("Cores: ${Runtime.getRuntime().availableProcessors()}")
         list.add("Download: %.1f s".format(downloadTime.seconds()))
         list.add("Network file parsing: %.1f s".format(networkTime.seconds()))
         list.add("Pre-calculating routes: %.1f s".format(preCalcRoutesTime.seconds()))
-        list.add("|Minecart speed calculation: %.1f s".format(minecartSpeedTime.seconds()))
-        list.add("|Nether connections processing: %.1f s".format(netherConnectionTime.seconds()))
-        list.add("|Interchanges processing: %.1f s".format(interchangesTime.seconds()))
-        list.add("|Pathfinding algorithm: %.1f s".format(pathFindingAlgoTime.seconds()))
-        list.add("||Setup: %.1f s".format(pathFindingAlgoSetupTime.seconds()))
-        list.add("||Main loop: %.1f s".format(pathFindingAlgoMainLoopTime.seconds()))
-        list.add("||Path reconstruction: %.1f s".format(pathFindingAlgoPathReconstructionTime.seconds()))
+        list.add("| Minecart speed calculation: %.1f s".format(minecartSpeedTime.seconds()))
+        list.add("| Nether connections processing: %.1f s".format(netherConnectionTime.seconds()))
+        list.add("| Interchanges processing: %.1f s".format(interchangesTime.seconds()))
+        list.add("| Pathfinding algorithm: %.1f s".format(pathFindingAlgoTime.seconds()))
+        list.add("| | Setup: %.1f s".format(pathFindingAlgoSetupTime.seconds()))
+        list.add("| | Main loop: %.1f s".format(pathFindingAlgoMainLoopTime.seconds()))
+        list.add("| | Path reconstruction: %.1f s".format(pathFindingAlgoPathReconstructionTime.seconds()))
         return list
     }
 
