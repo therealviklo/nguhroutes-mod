@@ -235,40 +235,44 @@ class PreCalcRoutes {
         val processorBlockSize = stationsMut.size / processors
         // Main loop
         for (k in stationsMut) {
-            runBlocking {
-                for (processor in 0..<processors) {
-                    val start = processor * processorBlockSize
-                    val end = min(start + processorBlockSize, stationsMut.size)
-                    launch {
-                        for (iIndex in start..<end) {
-                            val i = stationKeys[iIndex]
-                            for (j in stationsMut) {
-                                val ij = pathInfo.getValue(Pair(i    , j.key)).get()
-                                val ik = pathInfo.getValue(Pair(i    , k.key)).get()
-                                val kj = pathInfo.getValue(Pair(k.key, j.key)).get()
-                                val dij = ij.dist
-                                val dik = ik.dist
-                                val dkj = kj.dist
+            val threads = mutableListOf<Thread>()
+            for (processor in 0..<processors) {
+                val start = processor * processorBlockSize
+                val end = min(start + processorBlockSize, stationsMut.size)
+                val thread = Thread {
+                    for (iIndex in start..<end) {
+                        val i = stationKeys[iIndex]
+                        for (j in stationsMut) {
+                            val ij = pathInfo.getValue(Pair(i    , j.key)).get()
+                            val ik = pathInfo.getValue(Pair(i    , k.key)).get()
+                            val kj = pathInfo.getValue(Pair(k.key, j.key)).get()
+                            val dij = ij.dist
+                            val dik = ik.dist
+                            val dkj = kj.dist
 
-                                // Extra cost for transferring from one line to another at a station.
-                                // Currently, staying on the same line incurs no extra cost since the distance should be zero.
-                                val arriveConn = ik.prev?.second
-                                val departConn = kj.first
-                                val extraCost = calcExtraCost(arriveConn, departConn)
+                            // Extra cost for transferring from one line to another at a station.
+                            // Currently, staying on the same line incurs no extra cost since the distance should be zero.
+                            val arriveConn = ik.prev?.second
+                            val departConn = kj.first
+                            val extraCost = calcExtraCost(arriveConn, departConn)
 
-                                if (dij > dik + dkj + extraCost) {
-                                    pathInfo.getValue(Pair(i, j.key)).set(
-                                        FWPathInfo(
-                                            dik + dkj + extraCost,
-                                            kj.prev,
-                                            ik.first
-                                        )
+                            if (dij > dik + dkj + extraCost) {
+                                pathInfo.getValue(Pair(i, j.key)).set(
+                                    FWPathInfo(
+                                        dik + dkj + extraCost,
+                                        kj.prev,
+                                        ik.first
                                     )
-                                }
+                                )
                             }
                         }
                     }
                 }
+                thread.start()
+                threads.add(thread)
+            }
+            for (thread in threads) {
+                thread.join()
             }
         }
         nrdpr?.pathFindingAlgoMainLoopTime?.stop()
