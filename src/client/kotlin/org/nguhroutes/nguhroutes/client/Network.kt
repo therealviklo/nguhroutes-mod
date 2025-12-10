@@ -15,7 +15,7 @@ import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.Vec3d
 import kotlin.collections.iterator
 
-const val supportedNetworkFormatVersion = "6.1"
+const val supportedNetworkFormatVersion = "7.0"
 
 data class Stop(val code: String, val coords: BlockPos, val time: Double? = null, val dist: Double? = null)
 data class Line(
