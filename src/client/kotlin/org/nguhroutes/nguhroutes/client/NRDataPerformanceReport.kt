@@ -2,7 +2,6 @@ package org.nguhroutes.nguhroutes.client
 
 import net.minecraft.client.network.ClientPlayerEntity
 import net.minecraft.text.Text
-import kotlin.time.Duration
 import kotlin.time.DurationUnit
 import kotlin.time.TimeSource
 
