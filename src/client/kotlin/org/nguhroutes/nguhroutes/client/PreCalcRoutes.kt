@@ -114,7 +114,7 @@ class PreCalcRoutes {
         }
         // Divide to get the average.
         minecartSpeedFactor /= minecartSpeedFactorDistance
-        if (!minecartSpeedFactor.isFinite() || minecartSpeedFactor == 0.0 || minecartSpeedFactor < 0.0) {
+        if (!minecartSpeedFactor.isFinite() || minecartSpeedFactor <= 0.0) {
             // If we get a weird value we just use this approximation
             minecartSpeedFactor = 1.0 / 100.0
         }
