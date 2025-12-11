@@ -181,8 +181,8 @@ class PreCalcRoutes {
                                 coordsA,
                                 coordsB,
                                 walkTime(coordsA.toBottomCenterPos(), coordsB.toBottomCenterPos()),
-                                false,
-                                true
+                                reverseDirection = false,
+                                averagedCoords = true
                             )
                         )
                     }
@@ -194,38 +194,50 @@ class PreCalcRoutes {
         nrdpr?.pathFindingAlgoTime?.start()
         nrdpr?.pathFindingAlgoSetupTime?.start()
         // Algorithm is Floyd–Warshall with path reconstruction
+        val stationKeys = stationsMut.keys.toList()
+        /** A map from station name to the index in stationKeys */
+        val stationIndices = HashMap<String, Int>()
+        for (i in 0..<stationKeys.size) {
+            stationIndices[stationKeys[i]] = i
+        }
+
         data class FWPathInfo(
             val dist: Double,
             /**
              * Penultimate stop for route and final connection
              */
-            val prev: Pair<String, Connection>?,
+            val prev: Pair<Int, Connection>?,
             /**
              * First connection of route
              */
             val first: Connection?
         )
-        val pathInfo = HashMap<Pair<String, String>, AtomicReference<FWPathInfo>>()
+        val pathInfo = mutableListOf<MutableList<AtomicReference<FWPathInfo>>>()
 
-        for (i in stationsMut) {
-            for (j in stationsMut) {
-                pathInfo[Pair(i.key, j.key)] = AtomicReference(FWPathInfo(
-                    Double.POSITIVE_INFINITY,
-                    null,
-                    null
-                ))
+        for (i in 0..<stationKeys.size) {
+            pathInfo.add(mutableListOf())
+            repeat(stationKeys.size) { // The value of j is not needed here
+                pathInfo[i].add(
+                    AtomicReference(
+                        FWPathInfo(
+                            Double.POSITIVE_INFINITY,
+                            null,
+                            null
+                        )
+                    )
+                )
             }
         }
-        for (station in stationsMut) {
-            for (conn in station.value.conns) {
-                pathInfo.getValue(Pair(station.key, conn.station)).set(FWPathInfo(
+        for (stationI in 0..<stationKeys.size) {
+            val station = stationsMut.getValue(stationKeys[stationI])
+            for (conn in station.conns) {
+                pathInfo[stationI][stationIndices.getValue(conn.station)].set(FWPathInfo(
                     conn.cost + stationExtraCost,
-                    Pair(station.key, conn),
+                    Pair(stationI, conn),
                     conn
                 ))
             }
         }
-        val stationKeys = stationsMut.keys.toList()
         nrdpr?.pathFindingAlgoSetupTime?.stop()
         nrdpr?.pathFindingAlgoMainLoopTime?.start()
         val numThreads = Runtime.getRuntime().availableProcessors()
@@ -233,7 +245,7 @@ class PreCalcRoutes {
         val threadBlockSize = stationsMut.size / numThreads
         val pool = Executors.newFixedThreadPool(numThreads)
         // Main loop
-        for (k in stationsMut) {
+        for (k in 0..<stationKeys.size) {
             val numThreadsInProgress = CountDownLatch(numThreads)
             for (threadNum in 0..<numThreads) {
                 // Each thread is assigned part of the range of values of i
@@ -246,9 +258,8 @@ class PreCalcRoutes {
                     start + threadBlockSize
                 }
                 pool.submit {
-                    for (iIndex in start..<end) {
-                        val i = stationKeys[iIndex]
-                        for (j in stationsMut) {
+                    for (i in start..<end) {
+                        for (j in 0..<stationKeys.size) {
                             // The fact that there are three reads from pathInfo here shouldn't be a problem because
                             // only kj can be modified by another thread. The only writes to pathInfo happening at this
                             // time are to ij (further down), and since the range of values of i is split across the
@@ -256,9 +267,9 @@ class PreCalcRoutes {
                             // kj has been modified when the read happens, it will as I understand it only be
                             // beneficial to this thread, in that the thread finds a shorter route earlier than it
                             // otherwise would have.
-                            val ij = pathInfo.getValue(Pair(i    , j.key)).get()
-                            val ik = pathInfo.getValue(Pair(i    , k.key)).get()
-                            val kj = pathInfo.getValue(Pair(k.key, j.key)).get()
+                            val ij = pathInfo[i][j].get()
+                            val ik = pathInfo[i][k].get()
+                            val kj = pathInfo[k][j].get()
                             val dij = ij.dist
                             val dik = ik.dist
                             val dkj = kj.dist
@@ -270,7 +281,7 @@ class PreCalcRoutes {
                             val extraCost = calcExtraCost(arriveConn, departConn)
 
                             if (dij > dik + dkj + extraCost) {
-                                pathInfo.getValue(Pair(i, j.key)).set(
+                                pathInfo[i][j].set(
                                     FWPathInfo(
                                         dik + dkj + extraCost,
                                         kj.prev,
@@ -288,15 +299,15 @@ class PreCalcRoutes {
         nrdpr?.pathFindingAlgoMainLoopTime?.stop()
         nrdpr?.pathFindingAlgoPathReconstructionTime?.start()
         // Path reconstruction
-        for (start in stationsMut) {
-            stationLoop@ for (end in stationsMut) {
-                if (pathInfo.getValue(Pair(start.key, end.key)).get().prev != null) {
-                    var currEndCode = end.key
+        for (start in 0..<stationKeys.size) {
+            stationLoop@ for (end in 0..<stationKeys.size) {
+                if (pathInfo[start][end].get().prev != null) {
+                    var currEndIndex = end
                     val path = mutableListOf<Connection>()
-                    while (start.key != currEndCode) {
-                        val newPrev = pathInfo.getValue(Pair(start.key, currEndCode)).get().prev
+                    while (start != currEndIndex) {
+                        val newPrev = pathInfo[start][currEndIndex].get().prev
                             ?: continue@stationLoop
-                        currEndCode = newPrev.first
+                        currEndIndex = newPrev.first
                         path.addFirst(newPrev.second)
                     }
                     var totalCost = 0.0
@@ -306,7 +317,7 @@ class PreCalcRoutes {
                             path[i]
                         )
                     }
-                    routesMut[Pair(start.key, end.key)] = PreCalcRoute(totalCost, path)
+                    routesMut[Pair(stationKeys[start], stationKeys[end])] = PreCalcRoute(totalCost, path)
                 }
             }
         }
