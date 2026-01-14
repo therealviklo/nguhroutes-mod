@@ -391,7 +391,7 @@ fun calcExtraCost(arriveConn: Connection?, departConn: Connection?): Double {
         if (wt < 1.0) { // Assume that a time of less than 1 seconds means no transfer
             wt
         } else {
-            wt + 1.0 // Extra cost for transferring to another line
+            wt + 5.0 // Extra cost for transferring to another line
         }
     } else {
         // As far as I understand it, this case can only occur if dik + dkj is infinite,
