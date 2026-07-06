@@ -708,7 +708,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
             }
         }
         for (warp in nrData.network.warps) {
-            if (!config.your_doom && warp.code == "XYD")
+            if (!config.your_doom && warp.code == "OKD")
                 continue
             checkIfWarpIsFaster(warp.code, warp.coords, warp.discount)
         }
