@@ -12,7 +12,6 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import net.minecraft.util.math.BlockPos
-import net.minecraft.util.math.Vec3d
 import kotlin.collections.iterator
 
 const val supportedNetworkFormatVersion = "7.0"
@@ -267,6 +266,19 @@ class Network(obj: JsonObject) {
                     }
                 }
             }
+        }
+        for (connection in connections) {
+            val coords = if (code == connection.overworldCode) {
+                connection.overworldCoords
+            } else if (code == connection.netherCode) {
+                connection.netherCoords
+            } else {
+                continue
+            }
+            x += coords.x
+            y += coords.y
+            z += coords.z
+            n += 1
         }
         if (n == 0L)
             return null
