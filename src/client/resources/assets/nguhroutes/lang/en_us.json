@@ -1,13 +1,25 @@
 {
   "key.category.nguhroutes": "NguhRoutes",
-  "key.nguhroutes.start_measuring": "Start measuring",
-  "key.nguhroutes.stop_measuring": "Stop measuring",
+
+  "key.nguhroutes.clear_bed_location": "Clear Bed Location",
+  "key.nguhroutes.clear_home_location": "Clear Home Location",
+  "key.nguhroutes.current_bed_location": "Current Bed Location: %1$s",
+  "key.nguhroutes.current_home_location": "Current Home Location: %1$s",
+  "key.nguhroutes.no_bed_location_set": "No Bed Location Set",
+  "key.nguhroutes.no_home_location_set": "No Home Location Set",
+  "key.nguhroutes.set_bed_location": "Set Bed Location",
+  "key.nguhroutes.set_home_location": "Set Home Location",
+
+  "key.nguhroutes.debug": "Debug Mode",
+  "key.nguhroutes.open_home_bed_config": "Open Home/Bed Config",
+  "key.nguhroutes.update_notifications": "Update Notifications",
+  "key.nguhroutes.your_doom": "your_doom Warp",
+
   "key.nguhroutes.copy_measuring": "Copy measuring JSON",
   "key.nguhroutes.copy_both_measuring": "Copy measuring JSON (both stops)",
   "key.nguhroutes.copy_coords": "Copy current coordinates",
-  "key.nguhroutes.toggle_waypoints": "Toggle waypoints",
   "key.nguhroutes.open_config": "Open NguhRoutes config",
-  "key.nguhroutes.debug": "Debug Mode",
-  "key.nguhroutes.your_doom": "your_doom Warp",
-  "key.nguhroutes.update_notifications": "Update Notifications"
+  "key.nguhroutes.toggle_waypoints": "Toggle waypoints",
+  "key.nguhroutes.start_measuring": "Start measuring",
+  "key.nguhroutes.stop_measuring": "Stop measuring"
 }

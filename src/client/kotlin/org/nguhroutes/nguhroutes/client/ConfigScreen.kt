@@ -22,6 +22,7 @@ class ConfigScreen(val config: Config, parent: Screen?) : GameOptionsScreen(
     override fun addOptions() {
         if (body != null) {
             body?.addAll(*config.screenOptions().toTypedArray())
+            body?.addAll(config.otherWidgets(this))
         }
     }
 }
