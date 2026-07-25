@@ -208,6 +208,8 @@ class Config {
     fun homeBedScreenWidgets(): List<ClickableWidget> {
         val widgets = mutableListOf<ClickableWidget>()
 
+        data class HomeButtonPair(var setButton: ButtonWidget? = null, var clearButton: ButtonWidget? = null)
+
         fun setHomeButtonTooltip(home: String, button: ButtonWidget, location: SerializableBlockPosDim?) {
             button.setTooltip(Tooltip.of(Text.translatable(if (location != null) {
                 "key.nguhroutes.current_${home}_location"
@@ -216,13 +218,18 @@ class Config {
             }, location)))
         }
 
-        fun addSetHomeButton(home: String, setHome: (SerializableBlockPosDim?) -> Unit, getHome: () -> SerializableBlockPosDim?): ButtonWidget {
+        fun addSetHomeButton(home: String, pair: HomeButtonPair, setHome: (SerializableBlockPosDim?) -> Unit, getHome: () -> SerializableBlockPosDim?) {
             val homeSetter = ButtonWidget.builder(Text.translatable("key.nguhroutes.set_${home}_location")) { button ->
                 val player = MinecraftClient.getInstance().player
                 if (player != null) {
                     val pos = player.blockPos
                     setHome(SerializableBlockPosDim(pos, player.clientWorld.registryKey.value.path))
                     setHomeButtonTooltip(home, button, getHome())
+
+                    val clearButton = pair.clearButton
+                    if (clearButton != null) {
+                        clearButton.active = true
+                    }
                 }
             }.build()
             setHomeButtonTooltip(home, homeSetter, getHome())
@@ -231,21 +238,34 @@ class Config {
             }
             widgets.add(homeSetter)
 
-            return homeSetter
+            pair.setButton = homeSetter
         }
 
-        val homeSetter = addSetHomeButton("home", { pos -> home_location = pos }, { home_location })
-        val bedSetter = addSetHomeButton("bed", { pos -> bed_location = pos }, { bed_location })
-
-        fun addClearHomeButton(home: String, button: ButtonWidget, getLocation: () -> SerializableBlockPosDim?, clearHome: () -> Unit) {
-            widgets.add(ButtonWidget.builder(Text.translatable("key.nguhroutes.clear_${home}_location")) {
+        fun addClearHomeButton(home: String, pair: HomeButtonPair, getLocation: () -> SerializableBlockPosDim?, clearHome: () -> Unit) {
+            val clearButton = ButtonWidget.builder(Text.translatable("key.nguhroutes.clear_${home}_location")) { button ->
                 clearHome()
-                setHomeButtonTooltip(home, button, getLocation())
-            }.build())
+                val setButton = pair.setButton
+                if (setButton != null) {
+                    setHomeButtonTooltip(home, setButton, getLocation())
+                }
+                button.active = false
+            }.build()
+            if (getLocation() == null) {
+                clearButton.active = false
+            }
+            widgets.add(clearButton)
+
+            pair.clearButton = clearButton
         }
 
-        addClearHomeButton("home", homeSetter, { home_location }, { home_location = null })
-        addClearHomeButton("bed", bedSetter, { bed_location }, { bed_location = null })
+        val homePair = HomeButtonPair()
+        val bedPair = HomeButtonPair()
+
+        addSetHomeButton("home", homePair, { pos -> home_location = pos }, { home_location })
+        addSetHomeButton("bed", bedPair, { pos -> bed_location = pos }, { bed_location })
+
+        addClearHomeButton("home", homePair, { home_location }, { home_location = null })
+        addClearHomeButton("bed", bedPair, { bed_location }, { bed_location = null })
 
         return widgets
     }
