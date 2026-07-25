@@ -631,7 +631,8 @@ class NguhroutesClient : ClientModInitializer, HudElement {
         var stationHasBeenSeen = false
         // This function finds the fastest route from a set of coordinates, assuming that you walk to stops. Warps are
         // handled later, and this function is called immediately as well as reused later for home/bed warping.
-        fun findFastestRouteOnFoot(startCoords: Vec3d, homeWarp: HomeWarp? = null) {
+        fun findFastestRouteOnFoot(startCoords: Vec3d, homeWarp: HomeWarp? = null): FastestRoute? {
+            var fastestRouteForThisRun: FastestRoute? = null
             for (route in nrData.preCalcRoutes.routes) {
                 if (route.value.conns.isEmpty())
                     continue
@@ -660,9 +661,11 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                             if (homeWarp != null) warpTypingCost else 0.0
                     if (time < (fastestRoute?.time ?: Double.POSITIVE_INFINITY)) {
                         fastestRoute = FastestRoute(route.value, route.key.first, time, homeWarp != null, homeWarp)
+                        fastestRouteForThisRun = fastestRoute
                     }
                 }
             }
+            return fastestRouteForThisRun
         }
         findFastestRouteOnFoot(startCoords)
 
@@ -699,7 +702,13 @@ class NguhroutesClient : ClientModInitializer, HudElement {
         // Home/bed warping
         fun checkHomeWarp(name: String, homeLocation: SerializableBlockPos?) {
             if (homeLocation != null) {
-                findFastestRouteOnFoot(homeLocation.blockpos().toBottomCenterPos(), HomeWarp(name, homeLocation.blockpos()))
+                val fastestRouteForHome = findFastestRouteOnFoot(
+                    homeLocation.blockpos().toBottomCenterPos(),
+                    HomeWarp(name, homeLocation.blockpos())
+                )
+                if (config.debug && !noDebug && fastestRouteForHome != null) {
+                    context.source.sendFeedback(Text.of("Warping to $name is %.1f s".format(fastestRouteForHome.time)))
+                }
             }
         }
         checkHomeWarp("Home", config.home_location)
