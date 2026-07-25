@@ -864,6 +864,10 @@ class NguhroutesClient : ClientModInitializer, HudElement {
             context.source.sendError(Text.literal("This command currently only works with 2-letter codes."))
             return
         }
+        if (ngationCode[0] == 'X') {
+            context.source.sendError(Text.literal("This command does not work for ŋationless codes (X__)."))
+            return
+        }
         val nrData = getNRData(context) ?: return
 
         context.source.sendFeedback(Text.literal("All stations in $ngationCode:")
