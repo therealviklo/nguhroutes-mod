@@ -304,7 +304,16 @@ class Network(obj: JsonObject) {
         } else if (code == null) {
             "Location"
         } else {
-            stationNames[code]?.getOrNull(0) ?: code
+            stationNames[code]?.getOrNull(0) ?: if (code.startsWith("N-")) {
+                val overworldName = stationNames[code.substring(2)]?.getOrNull(0)
+                if (overworldName != null) {
+                    "$overworldName Nether"
+                } else {
+                    code
+                }
+            } else {
+                code
+            }
         }
     }
 }
