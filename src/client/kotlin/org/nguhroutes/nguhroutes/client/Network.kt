@@ -298,8 +298,10 @@ class Network(obj: JsonObject) {
         }
     }
 
-    fun getNameOrCode(code: String?): String {
-        return if (code == null) {
+    fun getNameOrCode(code: String?, nameOverride: String? = null): String {
+        return if (nameOverride != null) {
+            nameOverride
+        } else if (code == null) {
             "Location"
         } else {
             stationNames[code]?.getOrNull(0) ?: code

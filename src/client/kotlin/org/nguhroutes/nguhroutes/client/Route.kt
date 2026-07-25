@@ -14,14 +14,33 @@ data class RouteStop(
      * be a warning that the coords may be inaccurate
      */
     val reverseDirection: Boolean,
+    /**
+     * This overrides the name from the code field.
+     */
+    val nameOverride: String? = null,
     val debugTime: Double? = null,
     val debugExtraTime: Double? = null,
 )
 
+data class HomeWarp(val name: String, val location: BlockPos)
+
 class Route {
     val stops: MutableList<RouteStop> = mutableListOf()
 
-    constructor(startCode: String, conns: List<Connection>, network: Network, warpStart: Boolean = false) {
+    constructor(startCode: String, conns: List<Connection>, network: Network, warpStart: Boolean = false, homeWarp: HomeWarp? = null) {
+        if (homeWarp != null) {
+            stops.add(RouteStop(
+                null,
+                homeWarp.location,
+                "overworld",
+                null,
+                "Warp",
+                null,
+                false,
+                homeWarp.name
+            ))
+        }
+
         val startCoords: BlockPos = if (conns.isEmpty()) {
             // This is the case for just running there
             network.findAverageStationCoordsThrowing(startCode)
@@ -33,7 +52,7 @@ class Route {
             startCoords,
             getDim(startCode),
             null,
-            if (warpStart) "Warp" else "Start",
+            if (homeWarp != null) "On foot" else if (warpStart) "Warp" else "Start",
             null,
             false
         ))
@@ -65,6 +84,7 @@ class Route {
                 network.lines[conn.line]?.name ?: conn.line,
                 fromCoordsDim,
                 conn.reverseDirection,
+                null,
                 conn.cost,
                 calcExtraCost(
                     if (i != 0) conns[i - 1] else null,

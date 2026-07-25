@@ -38,6 +38,7 @@ import net.minecraft.util.math.Vec3d
 import org.lwjgl.glfw.GLFW
 import java.util.concurrent.atomic.AtomicReference
 
+const val warpTypingCost = 3.0
 
 class NguhroutesClient : ClientModInitializer, HudElement {
     // TODO: nicer way of doing this?
@@ -517,7 +518,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
             val tr = MinecraftClient.getInstance().textRenderer
 
             var yBelow = by.toInt() + 10
-            @Suppress("AssignedValueIsNeverRead")
+//            @Suppress("AssignedValueIsNeverRead")
             fun drawTextBelow(text: String) {
                 context.drawCenteredTextWithShadow(tr, text, bx.toInt(), yBelow, (opacity.toInt() shl 24) or 0x00FFFFFF)
                 yBelow += tr.fontHeight
@@ -616,44 +617,54 @@ class NguhroutesClient : ClientModInitializer, HudElement {
     }
 
     private data class RouteWithCost(val route: Route, val cost: Double)
+    private data class FastestRoute(
+        val route: PreCalcRoute,
+        val start: String,
+        val time: Double,
+        val warpStart: Boolean = false,
+        val homeWarp: HomeWarp? = null
+    )
 
     private fun findRouteFromCoords(context: CommandContext<FabricClientCommandSource>, nrData: NRData, startCoords: Vec3d, dest: String, noDebug: Boolean = false): RouteWithCost? {
         // Find which route is fastest
-        var fastestRoute: PreCalcRoute? = null
-        var fastestRouteStart: String? = null
-        var fastestRouteTime: Double = Double.POSITIVE_INFINITY
+        var fastestRoute: FastestRoute? = null
         var stationHasBeenSeen = false
-        for (route in nrData.preCalcRoutes.routes) {
-            if (route.value.conns.isEmpty())
-                continue
-            if (route.key.second == dest) {
-                stationHasBeenSeen = true
-
-                if (!checkPlayerDim(getDim(route.key.first), context.source.player.clientWorld)) {
+        // This function finds the fastest route from a set of coordinates, assuming that you walk to stops. Warps are
+        // handled later, and this function is called immediately as well as reused later for home/bed warping.
+        fun findFastestRouteOnFoot(startCoords: Vec3d, homeWarp: HomeWarp? = null) {
+            for (route in nrData.preCalcRoutes.routes) {
+                if (route.value.conns.isEmpty())
                     continue
-                }
+                if (route.key.second == dest) {
+                    stationHasBeenSeen = true
 
-                val firstStop = route.value.conns.getOrNull(0)
-                // We shouldn't start with a connection on foot
-                if (firstStop?.line == "On foot") {
-                    continue
-                }
+                    if (!checkPlayerDim(getDim(route.key.first), context.source.player.clientWorld)) {
+                        continue
+                    }
 
-                val firstStopCoords = firstStop?.fromCoords
-                // If we can't determine the coords for the initial stop we can't use that route
-                if (firstStopCoords == null) {
-                    continue
-                }
+                    val firstStop = route.value.conns.getOrNull(0)
+                    // We shouldn't start with a connection on foot
+                    if (firstStop?.line == "On foot") {
+                        continue
+                    }
 
-                // Add the time it takes to sprint to the stop
-                val time = route.value.time + sprintTime(startCoords, firstStopCoords.toBottomCenterPos())
-                if (time < fastestRouteTime) {
-                    fastestRoute = route.value
-                    fastestRouteStart = route.key.first
-                    fastestRouteTime = time
+                    val firstStopCoords = firstStop?.fromCoords
+                    // If we can't determine the coords for the initial stop we can't use that route
+                    if (firstStopCoords == null) {
+                        continue
+                    }
+
+                    // Add the time it takes to sprint to the stop
+                    val time = route.value.time + sprintTime(startCoords, firstStopCoords.toBottomCenterPos()) +
+                            // If there is a home/bed warp, add the time for typing the warp too
+                            if (homeWarp != null) warpTypingCost else 0.0
+                    if (time < (fastestRoute?.time ?: Double.POSITIVE_INFINITY)) {
+                        fastestRoute = FastestRoute(route.value, route.key.first, time, homeWarp != null, homeWarp)
+                    }
                 }
             }
         }
+        findFastestRouteOnFoot(startCoords)
 
         if (!stationHasBeenSeen) {
             if (nrData.network.stationNames.containsKey(dest)) {
@@ -667,7 +678,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
         }
 
         if (config.debug && !noDebug && fastestRoute != null) {
-            context.source.sendFeedback(Text.of("Fastest regular route is %.1f s, from $fastestRouteStart".format(fastestRouteTime)))
+            context.source.sendFeedback(Text.of("Fastest regular route is %.1f s, from ${fastestRoute.start}".format(fastestRoute.time)))
         }
 
         if (checkPlayerDim(getDim(dest), context.source.player.clientWorld)) {
@@ -675,19 +686,25 @@ class NguhroutesClient : ClientModInitializer, HudElement {
             val coords = nrData.network.findAverageStationCoords(dest)
             if (coords != null) {
                 val directTime = sprintTime(startCoords, coords.toBottomCenterPos())
-                if (directTime < fastestRouteTime) {
-                    fastestRoute = PreCalcRoute(0.0, listOf())
-                    fastestRouteStart = dest
-                    fastestRouteTime = directTime
+                if (directTime < (fastestRoute?.time ?: Double.POSITIVE_INFINITY)) {
+                    fastestRoute = FastestRoute(PreCalcRoute(0.0, listOf()), dest, directTime)
 
                     if (config.debug && !noDebug) {
-                        context.source.sendFeedback(Text.of("Sprinting is faster, %.1f s".format(fastestRouteTime)))
+                        context.source.sendFeedback(Text.of("Sprinting is faster, %.1f s".format(fastestRoute.time)))
                     }
                 }
             }
         }
 
-        var warpStart = false
+        // Home/bed warping
+        fun checkHomeWarp(name: String, homeLocation: SerializableBlockPos?) {
+            if (homeLocation != null) {
+                findFastestRouteOnFoot(homeLocation.blockpos().toBottomCenterPos(), HomeWarp(name, homeLocation.blockpos()))
+            }
+        }
+        checkHomeWarp("Home", config.home_location)
+        checkHomeWarp("Bed", config.bed_location)
+
         fun checkIfWarpIsFaster(code: String, warpCoords: BlockPos, discount: Double) {
             val route = nrData.preCalcRoutes.routes[Pair(code, dest)]
             if (route != null) {
@@ -696,14 +713,11 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                     ?: return
                 // Time is the time it takes for the route, plus the time it takes to sprint to the actual station
                 // from the warp, plus 3 seconds as an estimate for typing in and performing the warp
-                val time = route.time + sprintTime(warpCoords.toBottomCenterPos(), firstStopCoords.toBottomCenterPos()) + 3.0 - discount
+                val time = route.time + sprintTime(warpCoords.toBottomCenterPos(), firstStopCoords.toBottomCenterPos()) + warpTypingCost - discount
                 if (config.debug && !noDebug)
                     context.source.sendFeedback(Text.of("Warping to $code is %.1f s".format(time)))
-                if (time < fastestRouteTime) {
-                    fastestRoute = route
-                    fastestRouteStart = code
-                    fastestRouteTime = time
-                    warpStart = true
+                if (time < (fastestRoute?.time ?: Double.POSITIVE_INFINITY)) {
+                    fastestRoute = FastestRoute(route, code, time, true)
                 }
             }
         }
@@ -716,7 +730,13 @@ class NguhroutesClient : ClientModInitializer, HudElement {
         return if (fastestRoute == null) {
             null
         } else {
-            RouteWithCost(Route(fastestRouteStart!!, fastestRoute.conns, nrData.network, warpStart), fastestRouteTime)
+            RouteWithCost(Route(
+                fastestRoute.start,
+                fastestRoute.route.conns,
+                nrData.network,
+                fastestRoute.warpStart,
+                fastestRoute.homeWarp
+            ), fastestRoute.time)
         }
     }
 
@@ -840,7 +860,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
 
     private fun sendNextStopMessage(stop: RouteStop, context: CommandContext<FabricClientCommandSource>? = null) {
         val nrData = getNRData(context) ?: return
-        val name = nrData.network.getNameOrCode(stop.code)
+        val name = nrData.network.getNameOrCode(stop.code, stop.nameOverride)
         var text = if (stop.code == null) {
             Text.literal("Next: $name (")
         } else {
@@ -872,7 +892,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                     .withUnderline(true)))
             for (i in currRoutePair.first.stops.indices) {
                 val stop = currRoutePair.first.stops[i]
-                val name = nrData.network.getNameOrCode(stop.code)
+                val name = nrData.network.getNameOrCode(stop.code, stop.nameOverride)
                 var text = Text.literal(if (i == currRoutePair.second) "> " else "")
                 if (stop.code == null) {
                     text = text.append("$name (")
