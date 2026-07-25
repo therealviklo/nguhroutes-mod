@@ -48,7 +48,7 @@ class Network(obj: JsonObject) {
         for (dimension in linesObj) {
             for (line in dimension.value.jsonArray) {
                 val lineObj = line.jsonObject
-                val lineCode = addPrefix(lineObj.getValue("code").jsonPrimitive.content, prefixes.getValue(dimension.key))
+                val lineCode = addPrefix(lineObj.getValue("code").jsonPrimitive.content, prefixes.getValue(dimension.key)).uppercase()
                 val lineName = when (val name = lineObj["name"]) {
                     is JsonPrimitive -> name.content
                     is JsonArray -> name.getOrNull(0)?.jsonPrimitive?.content ?: lineCode
@@ -68,7 +68,7 @@ class Network(obj: JsonObject) {
                     }
                     val stopObj = stop.jsonObject
                     val coordsVal = stopObj["coords"] ?: continue
-                    val code = addPrefix(stopObj.getValue("code").jsonPrimitive.content, prefixes.getValue(dimension.key))
+                    val code = addPrefix(stopObj.getValue("code").jsonPrimitive.content, prefixes.getValue(dimension.key)).uppercase()
                     val coords = coordsVal.jsonArray
                     val x = coords[0].jsonPrimitive.int
                     val y = coords[1].jsonPrimitive.int
@@ -102,7 +102,7 @@ class Network(obj: JsonObject) {
                 val interchangeArr = interchange.jsonArray
                 val set = mutableSetOf<String>()
                 for (station in interchangeArr) {
-                    set.add(station.jsonPrimitive.content)
+                    set.add(station.jsonPrimitive.content.uppercase())
                 }
                 interchangesMut.add(set)
             }
@@ -115,7 +115,7 @@ class Network(obj: JsonObject) {
             for (connection in connectionsObject.jsonArray) {
                 val connArr = connection.jsonArray
                 fun getConnCodeCoords(end: JsonObject): Pair<String, BlockPos> {
-                    val code = end.getValue("code").jsonPrimitive.content
+                    val code = end.getValue("code").jsonPrimitive.content.uppercase()
                     val coordsArr = end.getValue("coords").jsonArray
                     val coords = BlockPos(
                         coordsArr[0].jsonPrimitive.int,
@@ -160,7 +160,7 @@ class Network(obj: JsonObject) {
                 val warp = warp.jsonObject
                 val coords = warp.getValue("coords").jsonArray
                 warpsMut.add(Warp(
-                    warp.getValue("code").jsonPrimitive.content,
+                    warp.getValue("code").jsonPrimitive.content.uppercase(),
                     BlockPos(
                         coords[0].jsonPrimitive.int,
                         coords[1].jsonPrimitive.int,
@@ -192,7 +192,7 @@ class Network(obj: JsonObject) {
                     }
                 }
 
-                var stationCode = station.key
+                var stationCode = station.key.uppercase()
                 var nameElement = getNameElement(station.value)
                 // Check if it is a reference to another entry. It deliberately doesn't check if the reference is
                 // another reference because that could cause recursive nightmares.
@@ -244,7 +244,7 @@ class Network(obj: JsonObject) {
         val aliasesObj = obj["aliases"]?.jsonObject
         if (aliasesObj != null) {
             for (alias in aliasesObj) {
-                aliasesMut[alias.key] = alias.value.jsonPrimitive.content
+                aliasesMut[alias.key.uppercase()] = alias.value.jsonPrimitive.content.uppercase()
             }
         }
         aliases = aliasesMut
