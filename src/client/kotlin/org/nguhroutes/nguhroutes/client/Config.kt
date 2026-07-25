@@ -30,15 +30,15 @@ private val jsonFormat = Json { ignoreUnknownKeys = true }
 private val executor = Executors.newSingleThreadExecutor()
 
 @Serializable
-class SerializableBlockPos(val x: Int, val y: Int, val z: Int) {
-    constructor(blockPos: BlockPos) : this(blockPos.x, blockPos.y, blockPos.z)
+class SerializableBlockPosDim(val x: Int, val y: Int, val z: Int, val dimension: String) {
+    constructor(blockPos: BlockPos, dimension: String) : this(blockPos.x, blockPos.y, blockPos.z, dimension)
 
     fun blockpos(): BlockPos {
         return BlockPos(x, y, z)
     }
 
     override fun toString(): String {
-        return "$x $y $z"
+        return "$x $y $z" + if (dimension != "overworld") " (${dimName(dimension)})" else ""
     }
 }
 
@@ -60,12 +60,12 @@ class Config {
             field = value
             saveConfig()
         }
-    var home_location: SerializableBlockPos? = null
+    var home_location: SerializableBlockPosDim? = null
         set(value) {
             field = value
             saveConfig()
         }
-    var bed_location: SerializableBlockPos? = null
+    var bed_location: SerializableBlockPosDim? = null
         set(value) {
             field = value
             saveConfig()
@@ -129,7 +129,7 @@ class Config {
             }
         }
 
-        fun addHomeArg(home: String, setHome: (SerializableBlockPos?) -> Unit, getHome: () -> SerializableBlockPos?) {
+        fun addHomeArg(home: String, setHome: (SerializableBlockPosDim?) -> Unit, getHome: () -> SerializableBlockPosDim?) {
             builder = builder.then(ClientCommandManager.literal(home)
                 .executes { context ->
                     context.source.sendFeedback(Text.of("Value of $home: ${getHome()}"))
@@ -148,15 +148,25 @@ class Config {
                                 val x = CoordinateArgumentType.getCoordinate(context, "x", context.source.player.x).toInt()
                                 val y = CoordinateArgumentType.getCoordinate(context, "y", context.source.player.y).toInt()
                                 val z = CoordinateArgumentType.getCoordinate(context, "z", context.source.player.z).toInt()
-                                setHome(SerializableBlockPos(x, y, z))
+                                setHome(SerializableBlockPosDim(x, y, z, "overworld"))
                                 context.source.sendFeedback(Text.of("Set $home to $x $y $z"))
                                 1
-                            })))
+                            }
+                            .then(ClientCommandManager.literal("nether")
+                                .executes { context ->
+                                    val x = CoordinateArgumentType.getCoordinate(context, "x", context.source.player.x).toInt()
+                                    val y = CoordinateArgumentType.getCoordinate(context, "y", context.source.player.y).toInt()
+                                    val z = CoordinateArgumentType.getCoordinate(context, "z", context.source.player.z).toInt()
+                                    setHome(SerializableBlockPosDim(x, y, z, "the_nether"))
+                                    context.source.sendFeedback(Text.of("Set $home to $x $y $z (Nether)"))
+                                    1
+                                }))))
                 .then(ClientCommandManager.literal("here")
                     .executes { context ->
-                        val pos = SerializableBlockPos(context.source.player.blockPos)
+                        val dim = context.source.player.clientWorld.registryKey.value.path
+                        val pos = SerializableBlockPosDim(context.source.player.blockPos, dim)
                         setHome(pos)
-                        context.source.sendFeedback(Text.of("Set $home to $pos"))
+                        context.source.sendFeedback(Text.of("Set $home to $pos" + if (dim != "overworld") " (${dimName(dim)})" else ""))
                         1
                     }))
         }
@@ -198,7 +208,7 @@ class Config {
     fun homeBedScreenWidgets(): List<ClickableWidget> {
         val widgets = mutableListOf<ClickableWidget>()
 
-        fun setHomeButtonTooltip(home: String, button: ButtonWidget, location: SerializableBlockPos?) {
+        fun setHomeButtonTooltip(home: String, button: ButtonWidget, location: SerializableBlockPosDim?) {
             button.setTooltip(Tooltip.of(Text.translatable(if (location != null) {
                 "key.nguhroutes.current_${home}_location"
             } else {
@@ -206,11 +216,12 @@ class Config {
             }, location)))
         }
 
-        fun addSetHomeButton(home: String, setHome: (SerializableBlockPos?) -> Unit, getHome: () -> SerializableBlockPos?): ButtonWidget {
+        fun addSetHomeButton(home: String, setHome: (SerializableBlockPosDim?) -> Unit, getHome: () -> SerializableBlockPosDim?): ButtonWidget {
             val homeSetter = ButtonWidget.builder(Text.translatable("key.nguhroutes.set_${home}_location")) { button ->
-                val pos = MinecraftClient.getInstance().player?.blockPos
-                if (pos != null) {
-                    setHome(SerializableBlockPos(pos))
+                val player = MinecraftClient.getInstance().player
+                if (player != null) {
+                    val pos = player.blockPos
+                    setHome(SerializableBlockPosDim(pos, player.clientWorld.registryKey.value.path))
                     setHomeButtonTooltip(home, button, getHome())
                 }
             }.build()
@@ -226,7 +237,7 @@ class Config {
         val homeSetter = addSetHomeButton("home", { pos -> home_location = pos }, { home_location })
         val bedSetter = addSetHomeButton("bed", { pos -> bed_location = pos }, { bed_location })
 
-        fun addClearHomeButton(home: String, button: ButtonWidget, getLocation: () -> SerializableBlockPos?, clearHome: () -> Unit) {
+        fun addClearHomeButton(home: String, button: ButtonWidget, getLocation: () -> SerializableBlockPosDim?, clearHome: () -> Unit) {
             widgets.add(ButtonWidget.builder(Text.translatable("key.nguhroutes.clear_${home}_location")) {
                 clearHome()
                 setHomeButtonTooltip(home, button, getLocation())

@@ -22,7 +22,7 @@ data class RouteStop(
     val debugExtraTime: Double? = null,
 )
 
-data class HomeWarp(val name: String, val location: BlockPos)
+data class HomeWarp(val name: String, val location: SerializableBlockPosDim)
 
 class Route {
     val stops: MutableList<RouteStop> = mutableListOf()
@@ -31,8 +31,8 @@ class Route {
         if (homeWarp != null) {
             stops.add(RouteStop(
                 null,
-                homeWarp.location,
-                "overworld",
+                homeWarp.location.blockpos(),
+                homeWarp.location.dimension,
                 null,
                 "Warp",
                 null,

@@ -639,7 +639,11 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                 if (route.key.second == dest) {
                     stationHasBeenSeen = true
 
-                    if (!checkPlayerDim(getDim(route.key.first), context.source.player.clientWorld)) {
+                    if (!checkStringDim(getDim(route.key.first), if (homeWarp != null) {
+                        homeWarp.location.dimension
+                    } else {
+                        context.source.player.clientWorld.registryKey.value.path
+                    })) {
                         continue
                     }
 
@@ -659,9 +663,12 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                     val time = route.value.time + sprintTime(startCoords, firstStopCoords.toBottomCenterPos()) +
                             // If there is a home/bed warp, add the time for typing the warp too
                             if (homeWarp != null) warpTypingCost else 0.0
+                    val froute = FastestRoute(route.value, route.key.first, time, homeWarp != null, homeWarp)
                     if (time < (fastestRoute?.time ?: Double.POSITIVE_INFINITY)) {
-                        fastestRoute = FastestRoute(route.value, route.key.first, time, homeWarp != null, homeWarp)
-                        fastestRouteForThisRun = fastestRoute
+                        fastestRoute = froute
+                    }
+                    if (time < (fastestRouteForThisRun?.time ?: Double.POSITIVE_INFINITY)) {
+                        fastestRouteForThisRun = froute
                     }
                 }
             }
@@ -684,31 +691,44 @@ class NguhroutesClient : ClientModInitializer, HudElement {
             context.source.sendFeedback(Text.of("Fastest regular route is %.1f s, from ${fastestRoute.start}".format(fastestRoute.time)))
         }
 
-        if (checkPlayerDim(getDim(dest), context.source.player.clientWorld)) {
-            // Check if just sprinting there is faster
-            val coords = nrData.network.findAverageStationCoords(dest)
-            if (coords != null) {
-                val directTime = sprintTime(startCoords, coords.toBottomCenterPos())
-                if (directTime < (fastestRoute?.time ?: Double.POSITIVE_INFINITY)) {
-                    fastestRoute = FastestRoute(PreCalcRoute(0.0, listOf()), dest, directTime)
+        fun checkSprinting(startCoords: Vec3d, homeWarp: HomeWarp? = null) {
+            if (checkStringDim(getDim(dest), if (homeWarp != null) {
+                    homeWarp.location.dimension
+                } else {
+                    context.source.player.clientWorld.registryKey.value.path
+                })) {
+                // Check if just sprinting there is faster
+                val coords = nrData.network.findAverageStationCoords(dest)
+                if (coords != null) {
+                    val directTime = sprintTime(startCoords, coords.toBottomCenterPos())
+                    if (directTime < (fastestRoute?.time ?: Double.POSITIVE_INFINITY)) {
+                        val froute = FastestRoute(PreCalcRoute(0.0, listOf()), dest, directTime, homeWarp != null, homeWarp)
+                        fastestRoute = froute
 
-                    if (config.debug && !noDebug) {
-                        context.source.sendFeedback(Text.of("Sprinting is faster, %.1f s".format(fastestRoute.time)))
+                        if (config.debug && !noDebug) {
+                            if (homeWarp != null) {
+                                context.source.sendFeedback(Text.of("Sprinting from ${homeWarp.name} is faster, %.1f s".format(froute.time)))
+                            } else {
+                                context.source.sendFeedback(Text.of("Sprinting is faster, %.1f s".format(froute.time)))
+                            }
+                        }
                     }
                 }
             }
         }
+        checkSprinting(startCoords)
 
         // Home/bed warping
-        fun checkHomeWarp(name: String, homeLocation: SerializableBlockPos?) {
+        fun checkHomeWarp(name: String, homeLocation: SerializableBlockPosDim?) {
             if (homeLocation != null) {
                 val fastestRouteForHome = findFastestRouteOnFoot(
                     homeLocation.blockpos().toBottomCenterPos(),
-                    HomeWarp(name, homeLocation.blockpos())
+                    HomeWarp(name, homeLocation)
                 )
                 if (config.debug && !noDebug && fastestRouteForHome != null) {
-                    context.source.sendFeedback(Text.of("Warping to $name is %.1f s".format(fastestRouteForHome.time)))
+                    context.source.sendFeedback(Text.of("Fastest regular route from $name is %.1f s".format(fastestRouteForHome.time)))
                 }
+                checkSprinting(homeLocation.blockpos().toBottomCenterPos(), HomeWarp(name, homeLocation))
             }
         }
         checkHomeWarp("Home", config.home_location)
@@ -1024,5 +1044,9 @@ class NguhroutesClient : ClientModInitializer, HudElement {
 
     private fun checkPlayerDim(dim: String, clientWorld: ClientWorld): Boolean {
         return clientWorld.registryKey.value == Identifier.of(dim)
+    }
+
+    private fun checkStringDim(dim: String, otherDim: String): Boolean {
+        return Identifier.of(dim) == Identifier.of(otherDim)
     }
 }

@@ -70,3 +70,12 @@ fun downloadJson(url: String): JsonElement {
     val data = url.openStream().readAllBytes().decodeToString()
     return Json.parseToJsonElement(data)
 }
+
+val dimNames = mapOf("overworld" to "Overworld", "the_nether" to "Nether")
+
+/**
+ * Returns the name of the dimension with a certain identifier.
+ */
+fun dimName(identifier: String): String {
+    return dimNames[identifier] ?: identifier
+}
