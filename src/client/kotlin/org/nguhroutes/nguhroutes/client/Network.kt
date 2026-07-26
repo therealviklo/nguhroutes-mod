@@ -14,7 +14,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import net.minecraft.util.math.BlockPos
 import kotlin.collections.iterator
 
-const val supportedNetworkFormatVersion = "7.0"
+const val supportedNetworkFormatVersion = "7.1"
 
 data class Stop(val code: String, val coords: BlockPos, val time: Double? = null, val dist: Double? = null)
 data class Line(

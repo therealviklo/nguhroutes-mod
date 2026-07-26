@@ -639,11 +639,13 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                 if (route.key.second == dest) {
                     stationHasBeenSeen = true
 
-                    if (!checkStringDim(getDim(route.key.first), if (homeWarp != null) {
+                    val dim = if (homeWarp != null) {
                         homeWarp.location.dimension
                     } else {
                         context.source.player.clientWorld.registryKey.value.path
-                    })) {
+                    }
+                    // Skip if the first station is in a different dimension
+                    if (!checkStringDim(getDim(route.key.first), dim)) {
                         continue
                     }
 
@@ -656,6 +658,11 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                     val firstStopCoords = firstStop?.fromCoords
                     // If we can't determine the coords for the initial stop we can't use that route
                     if (firstStopCoords == null) {
+                        continue
+                    }
+
+                    // If in the Nether, you must be on the same side of the Nether ceiling.
+                    if (dim == "the_nether" && !sameSideOfCeil(startCoords.y, firstStopCoords.y.toDouble())) {
                         continue
                     }
 
@@ -691,15 +698,21 @@ class NguhroutesClient : ClientModInitializer, HudElement {
             context.source.sendFeedback(Text.of("Fastest regular route is %.1f s, from ${fastestRoute.start}".format(fastestRoute.time)))
         }
 
+        // Check if just sprinting there is faster
         fun checkSprinting(startCoords: Vec3d, homeWarp: HomeWarp? = null) {
-            if (checkStringDim(getDim(dest), if (homeWarp != null) {
-                    homeWarp.location.dimension
-                } else {
-                    context.source.player.clientWorld.registryKey.value.path
-                })) {
-                // Check if just sprinting there is faster
+            val dim = if (homeWarp != null) {
+                homeWarp.location.dimension
+            } else {
+                context.source.player.clientWorld.registryKey.value.path
+            }
+            if (checkStringDim(getDim(dest), dim)) {
                 val coords = nrData.network.findAverageStationCoords(dest)
                 if (coords != null) {
+                    // If in the Nether, you must be on the same side of the Nether ceiling.
+                    if (dim == "the_nether" && !sameSideOfCeil(startCoords.y, coords.y.toDouble())) {
+                        return
+                    }
+
                     val directTime = sprintTime(startCoords, coords.toBottomCenterPos())
                     if (directTime < (fastestRoute?.time ?: Double.POSITIVE_INFINITY)) {
                         val froute = FastestRoute(PreCalcRoute(0.0, listOf()), dest, directTime, homeWarp != null, homeWarp)

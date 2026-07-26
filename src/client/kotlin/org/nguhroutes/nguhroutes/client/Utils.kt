@@ -79,3 +79,10 @@ val dimNames = mapOf("overworld" to "Overworld", "the_nether" to "Nether")
 fun dimName(identifier: String): String {
     return dimNames[identifier] ?: identifier
 }
+
+/**
+ * Checks if two y-coords are on the same side of the Nether ceiling.
+ */
+fun sameSideOfCeil(y1: Double, y2: Double): Boolean {
+    return !((y1 < 128.0) xor (y2 < 128.0))
+}
