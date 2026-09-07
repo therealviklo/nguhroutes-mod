@@ -167,6 +167,7 @@ class PreCalcRoutes {
         // For interchanges, add connections between the stations
         for (set in net.interchanges) {
             for (stationCode in set) {
+                addStationIfNecessary(stationCode)
                 val station = stationsMut.getValue(stationCode)
                 for (s2 in set) {
                     if (stationCode == s2) continue

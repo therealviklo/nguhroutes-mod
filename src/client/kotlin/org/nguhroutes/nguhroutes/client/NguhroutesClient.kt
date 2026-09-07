@@ -205,8 +205,9 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                     1
                 }
                 .then(ClientCommandManager.literal("nonether")
-                    .executes {
-                        loadJson(true)
+                    .executes { context ->
+                        context.source.sendFeedback(Text.of("Reloading NguhRoutes data..."))
+                        loadJson(true, context.source.player)
                         1
                     }))
             .then(ClientCommandManager.literal("route")
