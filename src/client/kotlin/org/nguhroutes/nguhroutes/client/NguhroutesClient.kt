@@ -36,6 +36,7 @@ import net.minecraft.util.math.BlockPos
 import net.minecraft.util.math.MathHelper
 import net.minecraft.util.math.Vec3d
 import org.lwjgl.glfw.GLFW
+import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 
 const val warpTypingCost = 3.0
@@ -47,14 +48,22 @@ class NguhroutesClient : ClientModInitializer, HudElement {
     var tracker: Tracker? = null
     var waypointsEnabled = true
 
+    private val loadGeneration = AtomicLong(0)
+    private val loadLock = Any()
+
     init {
+        // config is not available here so this is run later a second time if nonether_by_default is enabled.
         loadJson(false)
     }
 
     fun loadJson(noNether: Boolean, feedback: ClientPlayerEntity? = null) {
-        val nullPair = Pair(null, null)
-        nrDataLoadError.set(nullPair)
         currRoutePair.set(null)
+
+        val myGen = synchronized(loadLock) {
+            nrDataLoadError.set(Pair(null, null))
+            loadGeneration.incrementAndGet()
+        }
+
         Thread {
             try {
                 val nrdpr = if (config.debug) {
@@ -79,15 +88,28 @@ class NguhroutesClient : ClientModInitializer, HudElement {
 
                 nrdpr?.totalTime?.stop()
 
-                nrDataLoadError.compareAndSet(nullPair, Pair(NRData(network, preCalcRoutes), null))
-                feedback?.sendMessage(Text.of("Finished loading NguhRoutes data!"), false)
+                val won = synchronized(loadLock) {
+                    if (loadGeneration.get() != myGen) false
+                    else {
+                        nrDataLoadError.set(Pair(NRData(network, preCalcRoutes), null))
+                        true
+                    }
+                }
 
-                if (feedback != null) {
+                if (won && feedback != null) {
+                    feedback.sendMessage(Text.of("Finished loading NguhRoutes data!"), false)
                     nrdpr?.sendReportMessage(feedback)
                 }
             } catch (e: Exception) {
-                nrDataLoadError.compareAndSet(nullPair, Pair(null, e.toString()))
-                if (feedback != null)
+                val won = synchronized(loadLock) {
+                    if (loadGeneration.get() != myGen) false
+                    else {
+                        nrDataLoadError.set(Pair(null, e.toString()))
+                        true
+                    }
+                }
+
+                if (won && feedback != null)
                     sendError(Text.of("Error when loading NguhRoutes data: ${e.toString()}"))
             }
         }.start()
@@ -109,6 +131,10 @@ class NguhroutesClient : ClientModInitializer, HudElement {
     override fun onInitializeClient() {
         // Load config from file
         config = loadConfig()
+        // config is not available when loadJson is first run so this needs to be run a second time here
+        if (config.nonether_by_default) {
+            loadJson(true)
+        }
 
         // Commands
         registerCommand(ClientCommandManager.literal("nguhroutes")
@@ -201,13 +227,19 @@ class NguhroutesClient : ClientModInitializer, HudElement {
             .then(ClientCommandManager.literal("reload")
                 .executes { context ->
                     context.source.sendFeedback(Text.of("Reloading NguhRoutes data..."))
-                    loadJson(false, context.source.player)
+                    loadJson(config.nonether_by_default, context.source.player)
                     1
                 }
                 .then(ClientCommandManager.literal("nonether")
                     .executes { context ->
                         context.source.sendFeedback(Text.of("Reloading NguhRoutes data..."))
                         loadJson(true, context.source.player)
+                        1
+                    })
+                .then(ClientCommandManager.literal("nether")
+                    .executes { context ->
+                        context.source.sendFeedback(Text.of("Reloading NguhRoutes data..."))
+                        loadJson(false, context.source.player)
                         1
                     }))
             .then(ClientCommandManager.literal("route")

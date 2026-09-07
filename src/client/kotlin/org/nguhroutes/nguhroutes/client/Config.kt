@@ -60,6 +60,11 @@ class Config {
             field = value
             saveConfig()
         }
+    var nonether_by_default: Boolean = false
+        set(value) {
+            field = value
+            saveConfig()
+        }
     var home_location: SerializableBlockPosDim? = null
         set(value) {
             field = value
@@ -180,7 +185,13 @@ class Config {
         val options = mutableListOf<SimpleOption<*>>()
 
         fun addBooleanSetting(x: KMutableProperty1<Config, Boolean>) {
-            options.add(SimpleOption.ofBoolean("key.nguhroutes.${x.name}", x.get(this)) { xNew -> x.set(this, xNew) })
+            val tooltipFactory = SimpleOption.constantTooltip<Boolean>(Text.translatable("key.nguhroutes.${x.name}.tooltip"))
+            val opt = SimpleOption.ofBoolean(
+                "key.nguhroutes.${x.name}",
+                tooltipFactory,
+                x.get(this)
+            ) { xNew -> x.set(this, xNew) }
+            options.add(opt)
         }
 
         @Suppress("UNCHECKED_CAST")

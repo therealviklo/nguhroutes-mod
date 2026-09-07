@@ -11,9 +11,14 @@
   "key.nguhroutes.set_home_location": "Set Home Location",
 
   "key.nguhroutes.debug": "Debug Mode",
+  "key.nguhroutes.debug.tooltip": "Outputs debug information in chat when using certain features.",
   "key.nguhroutes.open_home_bed_config": "Open Home/Bed Config",
   "key.nguhroutes.update_notifications": "Update Notifications",
+  "key.nguhroutes.update_notifications.tooltip": "Shows a notification in chat whenever a mod update is available.",
   "key.nguhroutes.your_doom": "your_doom Warp",
+  "key.nguhroutes.your_doom.tooltip": "If enabled, the your_doom warp will be recommended if warping to it is faster.",
+  "key.nguhroutes.nonether_by_default": "Nonether As Default",
+  "key.nguhroutes.nonether_by_default.tooltip": "If enabled, interdimensional transfers are not recommended by default. Can be temporarily overridden using \"/nr reload nether\" and \"/nr reload nonether\". Changing this option does not automatically perform a reload, so a manual reload is required for this to take effect.",
 
   "key.nguhroutes.copy_measuring": "Copy measuring JSON",
   "key.nguhroutes.copy_both_measuring": "Copy measuring JSON (both stops)",
