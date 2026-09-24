@@ -184,9 +184,9 @@ class Config {
         val options = mutableListOf<OptionInstance<*>>()
 
         fun addBooleanSetting(x: KMutableProperty1<Config, Boolean>) {
-            val tooltipFactory = OptionInstance.cachedConstantTooltip<Boolean>(Component.translatable("key.nguhroutes.${x.name}.tooltip"))
+            val tooltipFactory = OptionInstance.cachedConstantTooltip<Boolean>(Component.translatable("config.nguhroutes.${x.name}.tooltip"))
             val opt = OptionInstance.createBoolean(
-                "key.nguhroutes.${x.name}",
+                "config.nguhroutes.${x.name}",
                 tooltipFactory,
                 x.get(this)
             ) { xNew -> x.set(this, xNew) }
@@ -208,7 +208,7 @@ class Config {
     fun otherWidgets(parent: Screen): List<AbstractWidget> {
         val widgets = mutableListOf<AbstractWidget>()
 
-        widgets.add(Button.builder(Component.translatable("key.nguhroutes.open_home_bed_config")) {
+        widgets.add(Button.builder(Component.translatable("config.nguhroutes.open_home_bed_config")) {
             Minecraft.getInstance().gui.setScreen(HomeBedConfigScreen(this, parent))
         }.build())
 
@@ -222,14 +222,14 @@ class Config {
 
         fun setHomeButtonTooltip(home: String, button: Button, location: SerializableBlockPosDim?) {
             button.setTooltip(Tooltip.create(Component.translatable(if (location != null) {
-                "key.nguhroutes.current_${home}_location"
+                "config.nguhroutes.current_${home}_location"
             } else {
-                "key.nguhroutes.no_${home}_location_set"
+                "config.nguhroutes.no_${home}_location_set"
             }, location ?: "null")))
         }
 
         fun addSetHomeButton(home: String, pair: HomeButtonPair, setHome: (SerializableBlockPosDim?) -> Unit, getHome: () -> SerializableBlockPosDim?) {
-            val homeSetter = Button.builder(Component.translatable("key.nguhroutes.set_${home}_location")) { button ->
+            val homeSetter = Button.builder(Component.translatable("config.nguhroutes.set_${home}_location")) { button ->
                 val player = Minecraft.getInstance().player
                 if (player != null) {
                     val pos = player.blockPosition()
@@ -252,7 +252,7 @@ class Config {
         }
 
         fun addClearHomeButton(home: String, pair: HomeButtonPair, getLocation: () -> SerializableBlockPosDim?, clearHome: () -> Unit) {
-            val clearButton = Button.builder(Component.translatable("key.nguhroutes.clear_${home}_location")) { button ->
+            val clearButton = Button.builder(Component.translatable("config.nguhroutes.clear_${home}_location")) { button ->
                 clearHome()
                 val setButton = pair.setButton
                 if (setButton != null) {

@@ -1,24 +1,5 @@
 {
-  "key.category.nguhroutes": "NguhRoutes",
-
-  "key.nguhroutes.clear_bed_location": "Clear Bed Location",
-  "key.nguhroutes.clear_home_location": "Clear Home Location",
-  "key.nguhroutes.current_bed_location": "Current Bed Location: %1$s",
-  "key.nguhroutes.current_home_location": "Current Home Location: %1$s",
-  "key.nguhroutes.no_bed_location_set": "No Bed Location Set",
-  "key.nguhroutes.no_home_location_set": "No Home Location Set",
-  "key.nguhroutes.set_bed_location": "Set Bed Location",
-  "key.nguhroutes.set_home_location": "Set Home Location",
-
-  "key.nguhroutes.debug": "Debug Mode",
-  "key.nguhroutes.debug.tooltip": "Outputs debug information in chat when using certain features.",
-  "key.nguhroutes.open_home_bed_config": "Open Home/Bed Config",
-  "key.nguhroutes.update_notifications": "Update Notifications",
-  "key.nguhroutes.update_notifications.tooltip": "Shows a notification in chat whenever a mod update is available.",
-  "key.nguhroutes.your_doom": "your_doom Warp",
-  "key.nguhroutes.your_doom.tooltip": "If enabled, the your_doom warp will be recommended if warping to it is faster.",
-  "key.nguhroutes.nonether_by_default": "Nonether As Default",
-  "key.nguhroutes.nonether_by_default.tooltip": "If enabled, interdimensional transfers are not recommended by default. Can be temporarily overridden using \"/nr reload nether\" and \"/nr reload nonether\". Changing this option does not automatically perform a reload, so a manual reload is required for this to take effect.",
+  "key.category.nguhroutes.keys": "NguhRoutes",
 
   "key.nguhroutes.copy_measuring": "Copy measuring JSON",
   "key.nguhroutes.copy_both_measuring": "Copy measuring JSON (both stops)",
@@ -26,5 +7,24 @@
   "key.nguhroutes.open_config": "Open NguhRoutes config",
   "key.nguhroutes.toggle_waypoints": "Toggle waypoints",
   "key.nguhroutes.start_measuring": "Start measuring",
-  "key.nguhroutes.stop_measuring": "Stop measuring"
+  "key.nguhroutes.stop_measuring": "Stop measuring",
+
+  "config.nguhroutes.clear_bed_location": "Clear Bed Location",
+  "config.nguhroutes.clear_home_location": "Clear Home Location",
+  "config.nguhroutes.current_bed_location": "Current Bed Location: %1$s",
+  "config.nguhroutes.current_home_location": "Current Home Location: %1$s",
+  "config.nguhroutes.no_bed_location_set": "No Bed Location Set",
+  "config.nguhroutes.no_home_location_set": "No Home Location Set",
+  "config.nguhroutes.set_bed_location": "Set Bed Location",
+  "config.nguhroutes.set_home_location": "Set Home Location",
+
+  "config.nguhroutes.debug": "Debug Mode",
+  "config.nguhroutes.debug.tooltip": "Outputs debug information in chat when using certain features.",
+  "config.nguhroutes.open_home_bed_config": "Open Home/Bed Config",
+  "config.nguhroutes.update_notifications": "Update Notifications",
+  "config.nguhroutes.update_notifications.tooltip": "Shows a notification in chat whenever a mod update is available.",
+  "config.nguhroutes.your_doom": "your_doom Warp",
+  "config.nguhroutes.your_doom.tooltip": "If enabled, the your_doom warp will be recommended if warping to it is faster.",
+  "config.nguhroutes.nonether_by_default": "Nonether As Default",
+  "config.nguhroutes.nonether_by_default.tooltip": "If enabled, interdimensional transfers are not recommended by default. Can be temporarily overridden using \"/nr reload nether\" and \"/nr reload nonether\". Changing this option does not automatically perform a reload, so a manual reload is required for this to take effect."
 }
