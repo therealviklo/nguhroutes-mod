@@ -1,19 +1,19 @@
 package org.nguhroutes.nguhroutes.client
 
-import net.minecraft.client.MinecraftClient
-import net.minecraft.client.gui.screen.Screen
-import net.minecraft.client.gui.screen.option.GameOptionsScreen
-import net.minecraft.text.Text
+import net.minecraft.client.Minecraft
+import net.minecraft.client.gui.screens.Screen
+import net.minecraft.client.gui.screens.options.OptionsSubScreen
+import net.minecraft.network.chat.Component
 
 
-class HomeBedConfigScreen(val config: Config, parent: Screen?) : GameOptionsScreen(
+class HomeBedConfigScreen(val config: Config, parent: Screen?) : OptionsSubScreen(
     parent,
-    MinecraftClient.getInstance().options,
-    Text.literal("Home/Bed Config")
+    Minecraft.getInstance().options,
+    Component.literal("Home/Bed Config")
 ) {
     override fun addOptions() {
-        if (body != null) {
-            body?.addAll(config.homeBedScreenWidgets())
+        if (list != null) {
+            list?.addSmall(config.homeBedScreenWidgets())
         }
     }
 }

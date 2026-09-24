@@ -2,8 +2,8 @@ package org.nguhroutes.nguhroutes.client
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
-import net.minecraft.util.math.BlockPos
-import net.minecraft.util.math.Vec3d
+import net.minecraft.core.BlockPos
+import net.minecraft.world.phys.Vec3
 import java.net.URI
 import kotlin.math.roundToInt
 
@@ -33,21 +33,21 @@ fun distCloser(p: BlockPos, a: BlockPos, b: BlockPos): Boolean {
 /**
  * Calculates the time it takes to move in a straight line from pos to coords, given a speed expressed in seconds per block
  */
-fun moveTime(a: Vec3d, b: Vec3d, secondsPerBlock: Double): Double {
+fun moveTime(a: Vec3, b: Vec3, secondsPerBlock: Double): Double {
     return a.distanceTo(b) * secondsPerBlock
 }
 
 /**
  * Calculates the time it takes to sprint in a straight line from pos to coords
  */
-fun sprintTime(a: Vec3d, b: Vec3d): Double {
+fun sprintTime(a: Vec3, b: Vec3): Double {
     return moveTime(a, b, 1 / 5.612)
 }
 
 /**
  * Calculates the time it takes to walk in a straight line from pos to coords
  */
-fun walkTime(a: Vec3d, b: Vec3d): Double {
+fun walkTime(a: Vec3, b: Vec3): Double {
     return moveTime(a, b, 1 / 4.317)
 }
 

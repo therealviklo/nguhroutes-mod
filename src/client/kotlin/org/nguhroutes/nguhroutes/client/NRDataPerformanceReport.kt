@@ -1,7 +1,7 @@
 package org.nguhroutes.nguhroutes.client
 
-import net.minecraft.client.network.ClientPlayerEntity
-import net.minecraft.text.Text
+import net.minecraft.client.player.LocalPlayer
+import net.minecraft.network.chat.Component
 import kotlin.time.DurationUnit
 import kotlin.time.TimeSource
 
@@ -59,10 +59,10 @@ class NRDataPerformanceReport {
         return list
     }
 
-    fun sendReportMessage(feedback: ClientPlayerEntity) {
+    fun sendReportMessage(feedback: LocalPlayer) {
         val report = getReport()
         for (line in report) {
-            feedback.sendMessage(Text.of(line), false)
+            feedback.displayClientMessage(Component.nullToEmpty(line), false)
         }
     }
 }

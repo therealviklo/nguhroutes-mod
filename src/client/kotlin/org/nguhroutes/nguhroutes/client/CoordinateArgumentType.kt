@@ -4,13 +4,13 @@ import com.mojang.brigadier.StringReader
 import com.mojang.brigadier.arguments.ArgumentType
 import com.mojang.brigadier.context.CommandContext
 import com.mojang.brigadier.exceptions.DynamicCommandExceptionType
-import net.minecraft.text.Text
+import net.minecraft.network.chat.Component
 
 
 
 data class CoordinateArgument(val coordinate: Double, val relative: Boolean = false)
 
-val INVALID_COORDINATE = DynamicCommandExceptionType{ o: Any? -> Text.literal("Invalid coordinate argument: $o") }
+val INVALID_COORDINATE = DynamicCommandExceptionType{ o: Any? -> Component.literal("Invalid coordinate argument: $o") }
 
 class CoordinateArgumentType : ArgumentType<CoordinateArgument> {
     companion object {

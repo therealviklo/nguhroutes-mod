@@ -6,16 +6,16 @@ import kotlinx.serialization.json.Json
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource
 import net.fabricmc.loader.api.FabricLoader
-import net.minecraft.client.MinecraftClient
-import net.minecraft.client.gui.screen.Screen
-import net.minecraft.client.gui.tooltip.Tooltip
-import net.minecraft.client.gui.widget.ButtonWidget
-import net.minecraft.client.gui.widget.ClickableWidget
-import net.minecraft.client.option.SimpleOption
-import net.minecraft.text.Style
-import net.minecraft.text.Text
-import net.minecraft.util.Formatting
-import net.minecraft.util.math.BlockPos
+import net.minecraft.client.Minecraft
+import net.minecraft.client.gui.screens.Screen
+import net.minecraft.client.gui.components.Tooltip
+import net.minecraft.client.gui.components.Button
+import net.minecraft.client.gui.components.AbstractWidget
+import net.minecraft.client.OptionInstance
+import net.minecraft.network.chat.Style
+import net.minecraft.network.chat.Component
+import net.minecraft.ChatFormatting
+import net.minecraft.core.BlockPos
 import java.util.concurrent.Executors
 import kotlin.collections.mutableListOf
 import kotlin.io.path.createDirectories
@@ -92,9 +92,9 @@ class Config {
                 configFile.toFile().writeText(jsonText)
             } catch (e: Exception) {
                 if (debug) {
-                    MinecraftClient.getInstance().player?.sendMessage(
-                        Text.literal("NguhRoutes config error when saving: ${e.message}")
-                            .setStyle(Style.EMPTY.withColor(Formatting.RED)),
+                    Minecraft.getInstance().player?.displayClientMessage(
+                        Component.literal("NguhRoutes config error when saving: ${e.message}")
+                            .setStyle(Style.EMPTY.withColor(ChatFormatting.RED)),
                         false
                     )
                 }
@@ -108,19 +108,19 @@ class Config {
         fun addBooleanSetting(x: KMutableProperty1<Config, Boolean>) {
             builder = builder.then(ClientCommandManager.literal(x.name)
                 .executes { context ->
-                    context.source.sendFeedback(Text.of("Value of ${x.name}: ${x.get(this)}"))
+                    context.source.sendFeedback(Component.nullToEmpty("Value of ${x.name}: ${x.get(this)}"))
                     1
                 }
                 .then(ClientCommandManager.literal("true")
                     .executes { context ->
                         x.set(this, true)
-                        context.source.sendFeedback(Text.of("Set ${x.name} to: true"))
+                        context.source.sendFeedback(Component.nullToEmpty("Set ${x.name} to: true"))
                         1
                     })
                 .then(ClientCommandManager.literal("false")
                     .executes { context ->
                         x.set(this, false)
-                        context.source.sendFeedback(Text.of("Set ${x.name} to: false"))
+                        context.source.sendFeedback(Component.nullToEmpty("Set ${x.name} to: false"))
                         1
                     }))
         }
@@ -137,13 +137,13 @@ class Config {
         fun addHomeArg(home: String, setHome: (SerializableBlockPosDim?) -> Unit, getHome: () -> SerializableBlockPosDim?) {
             builder = builder.then(ClientCommandManager.literal(home)
                 .executes { context ->
-                    context.source.sendFeedback(Text.of("Value of $home: ${getHome()}"))
+                    context.source.sendFeedback(Component.nullToEmpty("Value of $home: ${getHome()}"))
                     1
                 }
                 .then(ClientCommandManager.literal("clear")
                     .executes { context ->
                         setHome(null)
-                        context.source.sendFeedback(Text.of("Cleared $home location"))
+                        context.source.sendFeedback(Component.nullToEmpty("Cleared $home location"))
                         1
                     })
                 .then(ClientCommandManager.argument("x", CoordinateArgumentType.coordinate())
@@ -154,7 +154,7 @@ class Config {
                                 val y = CoordinateArgumentType.getCoordinate(context, "y", context.source.player.y).toInt()
                                 val z = CoordinateArgumentType.getCoordinate(context, "z", context.source.player.z).toInt()
                                 setHome(SerializableBlockPosDim(x, y, z, "overworld"))
-                                context.source.sendFeedback(Text.of("Set $home to $x $y $z"))
+                                context.source.sendFeedback(Component.nullToEmpty("Set $home to $x $y $z"))
                                 1
                             }
                             .then(ClientCommandManager.literal("nether")
@@ -163,15 +163,15 @@ class Config {
                                     val y = CoordinateArgumentType.getCoordinate(context, "y", context.source.player.y).toInt()
                                     val z = CoordinateArgumentType.getCoordinate(context, "z", context.source.player.z).toInt()
                                     setHome(SerializableBlockPosDim(x, y, z, "the_nether"))
-                                    context.source.sendFeedback(Text.of("Set $home to $x $y $z (Nether)"))
+                                    context.source.sendFeedback(Component.nullToEmpty("Set $home to $x $y $z (Nether)"))
                                     1
                                 }))))
                 .then(ClientCommandManager.literal("here")
                     .executes { context ->
-                        val dim = context.source.player.clientWorld.registryKey.value.path
-                        val pos = SerializableBlockPosDim(context.source.player.blockPos, dim)
+                        val dim = context.source.player.clientLevel.dimension().location().path
+                        val pos = SerializableBlockPosDim(context.source.player.blockPosition(), dim)
                         setHome(pos)
-                        context.source.sendFeedback(Text.of("Set $home to $pos" + if (dim != "overworld") " (${dimName(dim)})" else ""))
+                        context.source.sendFeedback(Component.nullToEmpty("Set $home to $pos" + if (dim != "overworld") " (${dimName(dim)})" else ""))
                         1
                     }))
         }
@@ -181,12 +181,12 @@ class Config {
         return builder
     }
 
-    fun screenOptions(): List<SimpleOption<*>> {
-        val options = mutableListOf<SimpleOption<*>>()
+    fun screenOptions(): List<OptionInstance<*>> {
+        val options = mutableListOf<OptionInstance<*>>()
 
         fun addBooleanSetting(x: KMutableProperty1<Config, Boolean>) {
-            val tooltipFactory = SimpleOption.constantTooltip<Boolean>(Text.translatable("key.nguhroutes.${x.name}.tooltip"))
-            val opt = SimpleOption.ofBoolean(
+            val tooltipFactory = OptionInstance.cachedConstantTooltip<Boolean>(Component.translatable("key.nguhroutes.${x.name}.tooltip"))
+            val opt = OptionInstance.createBoolean(
                 "key.nguhroutes.${x.name}",
                 tooltipFactory,
                 x.get(this)
@@ -206,23 +206,23 @@ class Config {
         return options
     }
 
-    fun otherWidgets(parent: Screen?): List<ClickableWidget> {
-        val widgets = mutableListOf<ClickableWidget>()
+    fun otherWidgets(parent: Screen?): List<AbstractWidget> {
+        val widgets = mutableListOf<AbstractWidget>()
 
-        widgets.add(ButtonWidget.builder(Text.translatable("key.nguhroutes.open_home_bed_config")) {
-            MinecraftClient.getInstance().setScreen(HomeBedConfigScreen(this, parent))
+        widgets.add(Button.builder(Component.translatable("key.nguhroutes.open_home_bed_config")) {
+            Minecraft.getInstance().setScreen(HomeBedConfigScreen(this, parent))
         }.build())
 
         return widgets
     }
 
-    fun homeBedScreenWidgets(): List<ClickableWidget> {
-        val widgets = mutableListOf<ClickableWidget>()
+    fun homeBedScreenWidgets(): List<AbstractWidget> {
+        val widgets = mutableListOf<AbstractWidget>()
 
-        data class HomeButtonPair(var setButton: ButtonWidget? = null, var clearButton: ButtonWidget? = null)
+        data class HomeButtonPair(var setButton: Button? = null, var clearButton: Button? = null)
 
-        fun setHomeButtonTooltip(home: String, button: ButtonWidget, location: SerializableBlockPosDim?) {
-            button.setTooltip(Tooltip.of(Text.translatable(if (location != null) {
+        fun setHomeButtonTooltip(home: String, button: Button, location: SerializableBlockPosDim?) {
+            button.setTooltip(Tooltip.create(Component.translatable(if (location != null) {
                 "key.nguhroutes.current_${home}_location"
             } else {
                 "key.nguhroutes.no_${home}_location_set"
@@ -230,11 +230,11 @@ class Config {
         }
 
         fun addSetHomeButton(home: String, pair: HomeButtonPair, setHome: (SerializableBlockPosDim?) -> Unit, getHome: () -> SerializableBlockPosDim?) {
-            val homeSetter = ButtonWidget.builder(Text.translatable("key.nguhroutes.set_${home}_location")) { button ->
-                val player = MinecraftClient.getInstance().player
+            val homeSetter = Button.builder(Component.translatable("key.nguhroutes.set_${home}_location")) { button ->
+                val player = Minecraft.getInstance().player
                 if (player != null) {
-                    val pos = player.blockPos
-                    setHome(SerializableBlockPosDim(pos, player.clientWorld.registryKey.value.path))
+                    val pos = player.blockPosition()
+                    setHome(SerializableBlockPosDim(pos, player.clientLevel.dimension().location().path))
                     setHomeButtonTooltip(home, button, getHome())
 
                     val clearButton = pair.clearButton
@@ -244,7 +244,7 @@ class Config {
                 }
             }.build()
             setHomeButtonTooltip(home, homeSetter, getHome())
-            if (MinecraftClient.getInstance().player == null) {
+            if (Minecraft.getInstance().player == null) {
                 homeSetter.active = false
             }
             widgets.add(homeSetter)
@@ -253,7 +253,7 @@ class Config {
         }
 
         fun addClearHomeButton(home: String, pair: HomeButtonPair, getLocation: () -> SerializableBlockPosDim?, clearHome: () -> Unit) {
-            val clearButton = ButtonWidget.builder(Text.translatable("key.nguhroutes.clear_${home}_location")) { button ->
+            val clearButton = Button.builder(Component.translatable("key.nguhroutes.clear_${home}_location")) { button ->
                 clearHome()
                 val setButton = pair.setButton
                 if (setButton != null) {

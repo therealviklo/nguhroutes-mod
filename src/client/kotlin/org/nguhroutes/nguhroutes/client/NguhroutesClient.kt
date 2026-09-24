@@ -15,26 +15,26 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElement
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry
 import net.fabricmc.loader.api.FabricLoader
-import net.minecraft.client.MinecraftClient
-import net.minecraft.client.gui.DrawContext
-import net.minecraft.client.network.ClientPlayerEntity
-import net.minecraft.client.option.KeyBinding
-import net.minecraft.client.render.RenderTickCounter
-import net.minecraft.client.toast.SystemToast
-import net.minecraft.client.util.Clipboard
-import net.minecraft.client.util.InputUtil
-import net.minecraft.client.world.ClientWorld
-import net.minecraft.command.CommandRegistryAccess
-import net.minecraft.text.ClickEvent
-import net.minecraft.text.MutableText
-import net.minecraft.text.Style
-import net.minecraft.text.Text
-import net.minecraft.text.TextColor
-import net.minecraft.util.Formatting
-import net.minecraft.util.Identifier
-import net.minecraft.util.math.BlockPos
-import net.minecraft.util.math.MathHelper
-import net.minecraft.util.math.Vec3d
+import net.minecraft.client.Minecraft
+import net.minecraft.client.gui.GuiGraphics
+import net.minecraft.client.player.LocalPlayer
+import net.minecraft.client.KeyMapping
+import net.minecraft.client.DeltaTracker
+import net.minecraft.client.gui.components.toasts.SystemToast
+import com.mojang.blaze3d.platform.ClipboardManager
+import com.mojang.blaze3d.platform.InputConstants
+import net.minecraft.client.multiplayer.ClientLevel
+import net.minecraft.commands.CommandBuildContext
+import net.minecraft.network.chat.ClickEvent
+import net.minecraft.network.chat.MutableComponent
+import net.minecraft.network.chat.Style
+import net.minecraft.network.chat.Component
+import net.minecraft.network.chat.TextColor
+import net.minecraft.ChatFormatting
+import net.minecraft.resources.ResourceLocation
+import net.minecraft.core.BlockPos
+import net.minecraft.util.Mth
+import net.minecraft.world.phys.Vec3
 import org.lwjgl.glfw.GLFW
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
@@ -56,7 +56,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
         loadJson(false)
     }
 
-    fun loadJson(noNether: Boolean, feedback: ClientPlayerEntity? = null) {
+    fun loadJson(noNether: Boolean, feedback: LocalPlayer? = null) {
         currRoutePair.set(null)
 
         val myGen = synchronized(loadLock) {
@@ -97,7 +97,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                 }
 
                 if (won && feedback != null) {
-                    feedback.sendMessage(Text.of("Finished loading NguhRoutes data!"), false)
+                    feedback.displayClientMessage(Component.nullToEmpty("Finished loading NguhRoutes data!"), false)
                     nrdpr?.sendReportMessage(feedback)
                 }
             } catch (e: Exception) {
@@ -110,13 +110,13 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                 }
 
                 if (won && feedback != null)
-                    sendError(Text.of("Error when loading NguhRoutes data: ${e.toString()}"))
+                    sendError(Component.nullToEmpty("Error when loading NguhRoutes data: ${e.toString()}"))
             }
         }.start()
     }
 
     private fun registerCommand(command: LiteralArgumentBuilder<FabricClientCommandSource?>, redirects: List<String> = listOf()) {
-        ClientCommandRegistrationCallback.EVENT.register(ClientCommandRegistrationCallback { dispatcher: CommandDispatcher<FabricClientCommandSource?>, _/*registryAccess*/: CommandRegistryAccess? ->
+        ClientCommandRegistrationCallback.EVENT.register(ClientCommandRegistrationCallback { dispatcher: CommandDispatcher<FabricClientCommandSource?>, _/*registryAccess*/: CommandBuildContext? ->
             val command = dispatcher.register(command)
             for (redirect in redirects) {
                 dispatcher.register(
@@ -143,30 +143,30 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                     val container = FabricLoader.getInstance().getModContainer("nguhroutes").orElse(null)
                     val version = container?.metadata?.version?.friendlyString ?: "(unknown version)"
                     context.source.sendFeedback(
-                        Text.literal("NguhRoutes")
+                        Component.literal("NguhRoutes")
                         .setStyle(Style.EMPTY
                             .withItalic(true)
                             .withBold(true)
-                            .withUnderline(true))
-                        .append(Text.literal(" v$version")
+                            .withUnderlined(true))
+                        .append(Component.literal(" v$version")
                             .setStyle(Style.EMPTY
                                 .withItalic(false)
                                 .withBold(true)
-                                .withUnderline(true))))
-                    context.source.sendFeedback(Text.of("Supported format version: $supportedNetworkFormatVersion"))
+                                .withUnderlined(true))))
+                    context.source.sendFeedback(Component.nullToEmpty("Supported format version: $supportedNetworkFormatVersion"))
                     val nrDataLoadError = this@NguhroutesClient.nrDataLoadError.get()
                     val nrData = nrDataLoadError.first
                     val loadError = nrDataLoadError.second
                     if (nrData!= null) {
-                        context.source.sendFeedback(Text.literal("JSON data has been loaded"))
+                        context.source.sendFeedback(Component.literal("JSON data has been loaded"))
                     } else if (loadError != null) {
-                        context.source.sendFeedback(Text.literal("An error occurred when loading JSON data"))
+                        context.source.sendFeedback(Component.literal("An error occurred when loading JSON data"))
                     } else {
-                        context.source.sendFeedback(Text.literal("JSON data is still loading"))
+                        context.source.sendFeedback(Component.literal("JSON data is still loading"))
                     }
                     if (loadError != null) {
-                        context.source.sendFeedback(Text.literal("Error:"))
-                        context.source.sendError(Text.literal(loadError))
+                        context.source.sendFeedback(Component.literal("Error:"))
+                        context.source.sendError(Component.literal(loadError))
                     }
                     1
                 })
@@ -192,7 +192,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                                 val x = CoordinateArgumentType.getCoordinate(context, "x", context.source.player.x)
                                 val y = CoordinateArgumentType.getCoordinate(context, "y", context.source.player.y)
                                 val z = CoordinateArgumentType.getCoordinate(context, "z", context.source.player.z)
-                                setRouteToCoord(context, Vec3d(x, y, z), "overworld")
+                                setRouteToCoord(context, Vec3(x, y, z), "overworld")
                                 1
                             }
                             .then(ClientCommandManager.literal("nether")
@@ -200,18 +200,18 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                                     val x = CoordinateArgumentType.getCoordinate(context, "x", context.source.player.x)
                                     val y = CoordinateArgumentType.getCoordinate(context, "y", context.source.player.y)
                                     val z = CoordinateArgumentType.getCoordinate(context, "z", context.source.player.z)
-                                    setRouteToCoord(context, Vec3d(x, y, z), "the_nether")
+                                    setRouteToCoord(context, Vec3(x, y, z), "the_nether")
                                     1
                                 })))))
             .then(ClientCommandManager.literal("restart")
                 .executes { context ->
                     val currRoutePair = currRoutePair.get()
                     if (currRoutePair == null) {
-                        context.source.sendError(Text.literal("No active route"))
+                        context.source.sendError(Component.literal("No active route"))
                     } else {
                         val last = currRoutePair.first.stops.last()
                         if (last.code == null) {
-                            setRouteToCoord(context, last.coords.toBottomCenterPos(), last.dimension)
+                            setRouteToCoord(context, last.coords.bottomCenter, last.dimension)
                         } else {
                             setRouteFromCurrentPos(context, last.code)
                         }
@@ -221,24 +221,24 @@ class NguhroutesClient : ClientModInitializer, HudElement {
             .then(ClientCommandManager.literal("stop")
                 .executes {
                     currRoutePair.set(null)
-                    sendRouteMessage(Text.of("Cleared route"))
+                    sendRouteMessage(Component.nullToEmpty("Cleared route"))
                     1
                 })
             .then(ClientCommandManager.literal("reload")
                 .executes { context ->
-                    context.source.sendFeedback(Text.of("Reloading NguhRoutes data..."))
+                    context.source.sendFeedback(Component.nullToEmpty("Reloading NguhRoutes data..."))
                     loadJson(config.nonether_by_default, context.source.player)
                     1
                 }
                 .then(ClientCommandManager.literal("nonether")
                     .executes { context ->
-                        context.source.sendFeedback(Text.of("Reloading NguhRoutes data..."))
+                        context.source.sendFeedback(Component.nullToEmpty("Reloading NguhRoutes data..."))
                         loadJson(true, context.source.player)
                         1
                     })
                 .then(ClientCommandManager.literal("nether")
                     .executes { context ->
-                        context.source.sendFeedback(Text.of("Reloading NguhRoutes data..."))
+                        context.source.sendFeedback(Component.nullToEmpty("Reloading NguhRoutes data..."))
                         loadJson(false, context.source.player)
                         1
                     }))
@@ -275,20 +275,20 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                         val query = StringArgumentType.getString(context, "regex")
                         val nrData = getNRData(context) ?: return@executes 1
                         Thread {
-                            val finds = mutableListOf<Text>()
+                            val finds = mutableListOf<Component>()
                             for (station in nrData.network.stationNames) {
                                 val re = Regex(query, RegexOption.IGNORE_CASE)
-                                var longestNameFind: Text? = null
+                                var longestNameFind: Component? = null
                                 var longestNameLength = 0
                                 for (name in station.value) {
                                     if (longestNameFind != null && longestNameLength >= name.length)
                                         continue
                                     val match = re.find(name)
                                     if (match != null) {
-                                        val text = Text.literal(name.take(match.range.first))
-                                        Text.of(name.substring(match.range))
-                                            .getWithStyle(Style.EMPTY.withUnderline(true)).map { i -> text.append(i) }
-                                        text.append(Text.of(name.substring((match.range.last + 1)) + " (${station.key})"))
+                                        val text = Component.literal(name.take(match.range.first))
+                                        Component.nullToEmpty(name.substring(match.range))
+                                            .toFlatList(Style.EMPTY.withUnderlined(true)).map { i -> text.append(i) }
+                                        text.append(Component.nullToEmpty(name.substring((match.range.last + 1)) + " (${station.key})"))
                                         longestNameFind = text
                                         longestNameLength = name.length
                                     }
@@ -297,12 +297,12 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                                     finds.add(longestNameFind)
                             }
                             if (finds.isEmpty()) {
-                                context.source.sendFeedback(Text.of("No search results."))
+                                context.source.sendFeedback(Component.nullToEmpty("No search results."))
                             } else {
-                                context.source.sendFeedback(Text.literal("Search Results:")
+                                context.source.sendFeedback(Component.literal("Search Results:")
                                     .setStyle(Style.EMPTY
                                         .withBold(true)
-                                        .withUnderline(true)))
+                                        .withUnderlined(true)))
                                 for (result in finds) {
                                     context.source.sendFeedback(result)
                                 }
@@ -333,8 +333,8 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                         }))
                 .then(ClientCommandManager.literal("coords")
                     .executes { context ->
-                        copyBlockCoords(context.source.player.blockPos)
-                        context.source.sendFeedback(Text.of("Copied current coordinates to clipboard"))
+                        copyBlockCoords(context.source.player.blockPosition())
+                        context.source.sendFeedback(Component.nullToEmpty("Copied current coordinates to clipboard"))
                         1
                     }))
             .then(config.configCommand()),
@@ -361,7 +361,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                             val x = CoordinateArgumentType.getCoordinate(context, "x", context.source.player.x)
                             val y = CoordinateArgumentType.getCoordinate(context, "y", context.source.player.y)
                             val z = CoordinateArgumentType.getCoordinate(context, "z", context.source.player.z)
-                            setRouteToCoord(context, Vec3d(x, y, z), "overworld")
+                            setRouteToCoord(context, Vec3(x, y, z), "overworld")
                             1
                         }
                         .then(ClientCommandManager.literal("nether")
@@ -369,7 +369,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                                 val x = CoordinateArgumentType.getCoordinate(context, "x", context.source.player.x)
                                 val y = CoordinateArgumentType.getCoordinate(context, "y", context.source.player.y)
                                 val z = CoordinateArgumentType.getCoordinate(context, "z", context.source.player.z)
-                                setRouteToCoord(context, Vec3d(x, y, z), "the_nether")
+                                setRouteToCoord(context, Vec3(x, y, z), "the_nether")
                                 1
                             })))))
         ClientTickEvents.END_WORLD_TICK.register { clientWorld -> tick(clientWorld) }
@@ -380,107 +380,107 @@ class NguhroutesClient : ClientModInitializer, HudElement {
         }
 
         // Keybinds
-        val bindingStartMeasuring: KeyBinding = KeyBindingHelper.registerKeyBinding(
-            KeyBinding(
+        val bindingStartMeasuring: KeyMapping = KeyBindingHelper.registerKeyBinding(
+            KeyMapping(
                 "key.nguhroutes.start_measuring",
-                InputUtil.Type.KEYSYM,
+                InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_UNKNOWN,
                 "key.category.nguhroutes"
             )
         )
-        val bindingStopMeasuring: KeyBinding = KeyBindingHelper.registerKeyBinding(
-            KeyBinding(
+        val bindingStopMeasuring: KeyMapping = KeyBindingHelper.registerKeyBinding(
+            KeyMapping(
                 "key.nguhroutes.stop_measuring",
-                InputUtil.Type.KEYSYM,
+                InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_UNKNOWN,
                 "key.category.nguhroutes"
             )
         )
-        val bindingCopyMeasuring: KeyBinding = KeyBindingHelper.registerKeyBinding(
-            KeyBinding(
+        val bindingCopyMeasuring: KeyMapping = KeyBindingHelper.registerKeyBinding(
+            KeyMapping(
                 "key.nguhroutes.copy_measuring",
-                InputUtil.Type.KEYSYM,
+                InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_UNKNOWN,
                 "key.category.nguhroutes"
             )
         )
-        val bindingCopyBothMeasuring: KeyBinding = KeyBindingHelper.registerKeyBinding(
-            KeyBinding(
+        val bindingCopyBothMeasuring: KeyMapping = KeyBindingHelper.registerKeyBinding(
+            KeyMapping(
                 "key.nguhroutes.copy_both_measuring",
-                InputUtil.Type.KEYSYM,
+                InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_UNKNOWN,
                 "key.category.nguhroutes"
             )
         )
-        val bindingCopyCoords: KeyBinding = KeyBindingHelper.registerKeyBinding(
-            KeyBinding(
+        val bindingCopyCoords: KeyMapping = KeyBindingHelper.registerKeyBinding(
+            KeyMapping(
                 "key.nguhroutes.copy_coords",
-                InputUtil.Type.KEYSYM,
+                InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_UNKNOWN,
                 "key.category.nguhroutes"
             )
         )
-        val bindingToggleWaypoints: KeyBinding = KeyBindingHelper.registerKeyBinding(
-            KeyBinding(
+        val bindingToggleWaypoints: KeyMapping = KeyBindingHelper.registerKeyBinding(
+            KeyMapping(
                 "key.nguhroutes.toggle_waypoints",
-                InputUtil.Type.KEYSYM,
+                InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_UNKNOWN,
                 "key.category.nguhroutes"
             )
         )
-        val bindingConfigScreen: KeyBinding = KeyBindingHelper.registerKeyBinding(
-            KeyBinding(
+        val bindingConfigScreen: KeyMapping = KeyBindingHelper.registerKeyBinding(
+            KeyMapping(
                 "key.nguhroutes.open_config",
-                InputUtil.Type.KEYSYM,
+                InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_UNKNOWN,
                 "key.category.nguhroutes"
             )
         )
         ClientTickEvents.END_CLIENT_TICK.register { client ->
-            while (bindingStartMeasuring.wasPressed()) {
+            while (bindingStartMeasuring.consumeClick()) {
                 val player = client.player
                 if (player != null) {
                     startMeasuring(player)
                 }
             }
-            while (bindingStopMeasuring.wasPressed()) {
+            while (bindingStopMeasuring.consumeClick()) {
                 val player = client.player
                 if (player != null) {
                     stopMeasuring(player, null)
                 }
             }
-            while (bindingCopyMeasuring.wasPressed()) {
+            while (bindingCopyMeasuring.consumeClick()) {
                 val player = client.player
                 if (player != null) {
                     copyMeasuring(false, player, null)
                 }
             }
-            while (bindingCopyBothMeasuring.wasPressed()) {
+            while (bindingCopyBothMeasuring.consumeClick()) {
                 val player = client.player
                 if (player != null) {
                     copyMeasuring(true, player, null)
                 }
             }
-            while (bindingCopyCoords.wasPressed()) {
+            while (bindingCopyCoords.consumeClick()) {
                 val player = client.player
                 if (player != null) {
-                    copyBlockCoords(player.blockPos)
-                    player.sendMessage(Text.of("Copied current coordinates to clipboard"), false)
+                    copyBlockCoords(player.blockPosition())
+                    player.displayClientMessage(Component.nullToEmpty("Copied current coordinates to clipboard"), false)
                 }
             }
-            while (bindingToggleWaypoints.wasPressed()) {
+            while (bindingToggleWaypoints.consumeClick()) {
                 waypointsEnabled = !waypointsEnabled
             }
-            while (bindingConfigScreen.wasPressed()) {
-                val currentScreen = MinecraftClient.getInstance().currentScreen
-                MinecraftClient.getInstance().setScreen(ConfigScreen(config, currentScreen))
+            while (bindingConfigScreen.consumeClick()) {
+                val currentScreen = Minecraft.getInstance().screen
+                Minecraft.getInstance().setScreen(ConfigScreen(config, currentScreen))
             }
         }
 
-        HudElementRegistry.addFirst(Identifier.of("nguhroutes", "bottom"), this)
+        HudElementRegistry.addFirst(ResourceLocation.fromNamespaceAndPath("nguhroutes", "bottom"), this)
     }
 
-    override fun render(context: DrawContext, tickCounter: RenderTickCounter) {
+    override fun render(context: GuiGraphics, tickCounter: DeltaTracker) {
         if (!waypointsEnabled) return
         val nrData = getNRData(null, false) ?: return
         val currRoutePair = currRoutePair.get() ?: return
@@ -488,11 +488,11 @@ class NguhroutesClient : ClientModInitializer, HudElement {
         val currStop = currRoutePair.second
         if (currStop >= currRoute.stops.size) return
         val colour = nrData.network.lines[currRoute.stops[currStop].lineCode]?.colour ?: Colour(0xFFFFFFFF)
-        val clientWorld = MinecraftClient.getInstance().player?.clientWorld ?: return
+        val clientWorld = Minecraft.getInstance().player?.clientLevel ?: return
         val fromCoordsDim = currRoute.stops[currStop].fromCoordsDim
         if (fromCoordsDim == null) {
             if (checkPlayerDim(currRoute.stops[currStop].dimension, clientWorld))
-                renderWaypoint(context, currRoute.stops[currStop].coords.toCenterPos(), "Next", "(Approx.)", true, colour, 0xFFu)
+                renderWaypoint(context, currRoute.stops[currStop].coords.center, "Next", "(Approx.)", true, colour, 0xFFu)
         } else {
             val fromCoords = fromCoordsDim.first
             val fromDim = fromCoordsDim.second
@@ -503,62 +503,62 @@ class NguhroutesClient : ClientModInitializer, HudElement {
             }
             if (checkPlayerDim(fromDim, clientWorld)) {
                 val text = if (currRoute.stops[currStop].lineName == "Interdimensional transfer") "Next portal" else "Next platform"
-                renderWaypoint(context, fromCoords.toCenterPos(), text, text2, true, colour, 0xFFu)
+                renderWaypoint(context, fromCoords.center, text, text2, true, colour, 0xFFu)
             }
             if (checkPlayerDim(currRoute.stops[currStop].dimension, clientWorld))
-                renderWaypoint(context, currRoute.stops[currStop].coords.toCenterPos(), "Next stop", text2, false, colour, 0x7Fu)
+                renderWaypoint(context, currRoute.stops[currStop].coords.center, "Next stop", text2, false, colour, 0x7Fu)
         }
     }
 
-    private fun renderWaypoint(context: DrawContext, pos: Vec3d, text: String, text2: String?, angled: Boolean, colour: Colour, opacity: UByte) {
-        val player = MinecraftClient.getInstance().player ?: return
-        val camera = MinecraftClient.getInstance().cameraEntity ?: return
-        val matrices = context.matrices
+    private fun renderWaypoint(context: GuiGraphics, pos: Vec3, text: String, text2: String?, angled: Boolean, colour: Colour, opacity: UByte) {
+        val player = Minecraft.getInstance().player ?: return
+        val camera = Minecraft.getInstance().cameraEntity ?: return
+        val matrices = context.pose()
 
         val colour = colour.withOpacity(opacity)
 
-        val eye = camera.eyePos
+        val eye = camera.eyePosition
         val x = pos.x.toFloat() - eye.x.toFloat()
         val y = pos.y.toFloat() - eye.y.toFloat()
         val z = -(pos.z.toFloat() - eye.z.toFloat())
 
-        val tx = -camera.pitch * MathHelper.RADIANS_PER_DEGREE
-        val ty = camera.yaw * MathHelper.RADIANS_PER_DEGREE
+        val tx = -camera.xRot * Mth.DEG_TO_RAD
+        val ty = camera.yRot * Mth.DEG_TO_RAD
 //        val tz = 0.0f
 
-        val dz = MathHelper.cos(tx) * (MathHelper.cos(ty) * z + MathHelper.sin(ty) * (/* MathHelper.sin(tz) * y + */ /* MathHelper.cos(tz) * */ x)) - MathHelper.sin(tx) * (/* MathHelper.cos(tz) * */ y /* + MathHelper.sin(tz) * x */)
+        val dz = Mth.cos(tx) * (Mth.cos(ty) * z + Mth.sin(ty) * (/* Mth.sin(tz) * y + */ /* Mth.cos(tz) * */ x)) - Mth.sin(tx) * (/* Mth.cos(tz) * */ y /* + Mth.sin(tz) * x */)
         if (dz < 0.0f) {
-            val dx = MathHelper.cos(ty) * (/* MathHelper.sin(tz) * y + */ /* MathHelper.cos(tz) * */ x) - MathHelper.sin(ty) * z
-            val dy = MathHelper.sin(tx) * (MathHelper.cos(ty) * z + MathHelper.sin(ty) * (/* MathHelper.sin(tz) * y + */ /* MathHelper.cos(tz) * */ x)) + MathHelper.cos(tx) * (/* MathHelper.cos(tz) * */ y /* + MathHelper.sin(tz) * x */)
+            val dx = Mth.cos(ty) * (/* Mth.sin(tz) * y + */ /* Mth.cos(tz) * */ x) - Mth.sin(ty) * z
+            val dy = Mth.sin(tx) * (Mth.cos(ty) * z + Mth.sin(ty) * (/* Mth.sin(tz) * y + */ /* Mth.cos(tz) * */ x)) + Mth.cos(tx) * (/* Mth.cos(tz) * */ y /* + Mth.sin(tz) * x */)
 
             // Not quite sure what's going on with the fov but this makes it look correct enough
-            val fov1 = MinecraftClient.getInstance().options.fov.value * 0.01f * player.getFovMultiplier(true, 1.0f)
-            val fov2 = fov1 * (1.25f + MathHelper.square(fov1 - 0.3f))
-            val scale = context.scaledWindowHeight * 0.5f / 0.7f / fov2
+            val fov1 = Minecraft.getInstance().options.fov().get() * 0.01f * player.getFieldOfViewModifier(true, 1.0f)
+            val fov2 = fov1 * (1.25f + Mth.square(fov1 - 0.3f))
+            val scale = context.guiHeight() * 0.5f / 0.7f / fov2
 
-            val bx = 1.0f / dz * dx * scale + context.scaledWindowWidth * 0.5f
-            val by = 1.0f / dz * dy * scale + context.scaledWindowHeight * 0.5f
+            val bx = 1.0f / dz * dx * scale + context.guiWidth() * 0.5f
+            val by = 1.0f / dz * dy * scale + context.guiHeight() * 0.5f
 
             val colourARGB = colour.argb()
 
             matrices.pushMatrix()
             matrices.translate(bx, by)
             if (angled)
-                matrices.rotate(MathHelper.HALF_PI * 0.5f)
+                matrices.rotate(Mth.HALF_PI * 0.5f)
             context.fill(-5, -5, 5, 5, colourARGB)
             matrices.popMatrix()
 
-            val tr = MinecraftClient.getInstance().textRenderer
+            val tr = Minecraft.getInstance().font
 
             var yBelow = by.toInt() + 10
 //            @Suppress("AssignedValueIsNeverRead")
             fun drawTextBelow(text: String) {
-                context.drawCenteredTextWithShadow(tr, text, bx.toInt(), yBelow, (opacity.toInt() shl 24) or 0x00FFFFFF)
-                yBelow += tr.fontHeight
+                context.drawCenteredString(tr, text, bx.toInt(), yBelow, (opacity.toInt() shl 24) or 0x00FFFFFF)
+                yBelow += tr.lineHeight
             }
 
             drawTextBelow(text)
-            val dist = pos.distanceTo(player.pos)
+            val dist = pos.distanceTo(player.position())
             if (text2 != null && dist < 20.0) {
                 drawTextBelow(text2)
             }
@@ -574,10 +574,10 @@ class NguhroutesClient : ClientModInitializer, HudElement {
 
         val route = nrData.preCalcRoutes.routes[Pair(start, dest)]
         if (route == null) {
-            context.source.sendError(Text.literal("Could not find route."))
+            context.source.sendError(Component.literal("Could not find route."))
             return
         }
-        context.source.sendFeedback(Text.of("Time: %.1f s".format(route.time)))
+        context.source.sendFeedback(Component.nullToEmpty("Time: %.1f s".format(route.time)))
         val routeObj = Route(start, route.conns, nrData.network)
 
         setRoute(context, nrData, routeObj, dest)
@@ -587,16 +587,16 @@ class NguhroutesClient : ClientModInitializer, HudElement {
         val nrData = getNRData(context) ?: return
         val dest = nrData.network.getActualCode(dest)
         Thread {
-            val playerPos = context.source?.player?.pos
+            val playerPos = context.source?.player?.position()
             if (playerPos == null) {
-                context.source.sendError(Text.literal("Could not get player position."))
+                context.source.sendError(Component.literal("Could not get player position."))
                 return@Thread
             }
 
             val fastestRouteWithCost = findRouteFromCoords(context, nrData, playerPos, dest)
 
             if (fastestRouteWithCost == null) {
-                context.source.sendError(Text.literal("Could not find route."))
+                context.source.sendError(Component.literal("Could not find route."))
                 return@Thread
             }
 
@@ -604,25 +604,25 @@ class NguhroutesClient : ClientModInitializer, HudElement {
         }.start()
     }
 
-    private fun setRouteToCoord(context: CommandContext<FabricClientCommandSource>, destCoords: Vec3d, dimension: String) {
+    private fun setRouteToCoord(context: CommandContext<FabricClientCommandSource>, destCoords: Vec3, dimension: String) {
         val nrData = getNRData(context) ?: return
         Thread {
-            val playerPos = context.source?.player?.pos
+            val playerPos = context.source?.player?.position()
             if (playerPos == null) {
-                context.source.sendError(Text.literal("Could not get player position."))
+                context.source.sendError(Component.literal("Could not get player position."))
                 return@Thread
             }
 
-            context.source.sendFeedback(Text.of("Finding route to coordinate..."))
+            context.source.sendFeedback(Component.nullToEmpty("Finding route to coordinate..."))
 
             var fastestRouteWithCost = RouteWithCost(
-                Route(BlockPos.ofFloored(destCoords), dimension), sprintTime(playerPos, destCoords)
+                Route(BlockPos.containing(destCoords), dimension), sprintTime(playerPos, destCoords)
             )
             var fastestDestStation: String? = null
             for (destStation in nrData.preCalcRoutes.stations.keys) {
                 if (getDim(destStation) != dimension) continue
                 val route = findRouteFromCoords(context, nrData, playerPos, destStation, true) ?: continue
-                val routeFinish = route.route.stops.getOrNull(route.route.stops.size - 1)?.coords?.toBottomCenterPos() ?: continue
+                val routeFinish = route.route.stops.getOrNull(route.route.stops.size - 1)?.coords?.bottomCenter ?: continue
                 val cost = route.cost + sprintTime(routeFinish, destCoords)
                 if (fastestRouteWithCost.cost > cost) {
                     fastestRouteWithCost = RouteWithCost(route.route, cost)
@@ -636,7 +636,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
             if (fastestDestStation != null) {
                 fastestRouteWithCost.route.stops.add(RouteStop(
                     null,
-                    BlockPos.ofFloored(destCoords),
+                    BlockPos.containing(destCoords),
                     getDim(fastestDestStation),
                     null,
                     "On foot",
@@ -658,13 +658,13 @@ class NguhroutesClient : ClientModInitializer, HudElement {
         val homeWarp: HomeWarp? = null
     )
 
-    private fun findRouteFromCoords(context: CommandContext<FabricClientCommandSource>, nrData: NRData, startCoords: Vec3d, dest: String, noDebug: Boolean = false): RouteWithCost? {
+    private fun findRouteFromCoords(context: CommandContext<FabricClientCommandSource>, nrData: NRData, startCoords: Vec3, dest: String, noDebug: Boolean = false): RouteWithCost? {
         // Find which route is fastest
         var fastestRoute: FastestRoute? = null
         var stationHasBeenSeen = false
         // This function finds the fastest route from a set of coordinates, assuming that you walk to stops. Warps are
         // handled later, and this function is called immediately as well as reused later for home/bed warping.
-        fun findFastestRouteOnFoot(startCoords: Vec3d, homeWarp: HomeWarp? = null): FastestRoute? {
+        fun findFastestRouteOnFoot(startCoords: Vec3, homeWarp: HomeWarp? = null): FastestRoute? {
             var fastestRouteForThisRun: FastestRoute? = null
             for (route in nrData.preCalcRoutes.routes) {
                 if (route.value.conns.isEmpty())
@@ -675,7 +675,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                     val dim = if (homeWarp != null) {
                         homeWarp.location.dimension
                     } else {
-                        context.source.player.clientWorld.registryKey.value.path
+                        context.source.player.clientLevel.dimension().location().path
                     }
                     // Skip if the first station is in a different dimension
                     if (!checkStringDim(getDim(route.key.first), dim)) {
@@ -700,7 +700,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                     }
 
                     // Add the time it takes to sprint to the stop
-                    val time = route.value.time + sprintTime(startCoords, firstStopCoords.toBottomCenterPos()) +
+                    val time = route.value.time + sprintTime(startCoords, firstStopCoords.bottomCenter) +
                             // If there is a home/bed warp, add the time for typing the warp too
                             if (homeWarp != null) warpTypingCost else 0.0
                     val froute = FastestRoute(route.value, route.key.first, time, homeWarp != null, homeWarp)
@@ -720,23 +720,23 @@ class NguhroutesClient : ClientModInitializer, HudElement {
             if (nrData.network.stationNames.containsKey(dest)) {
                 // This is the case for where a station is in the "stations" property in network.jsonc,
                 // but is not actually anywhere in the network.
-                context.source.sendError(Text.literal("Could not find route to station \"${dest}\"."))
+                context.source.sendError(Component.literal("Could not find route to station \"${dest}\"."))
             } else {
-                context.source.sendError(Text.literal("Could not find station \"${dest}\"."))
+                context.source.sendError(Component.literal("Could not find station \"${dest}\"."))
             }
             return null
         }
 
         if (config.debug && !noDebug && fastestRoute != null) {
-            context.source.sendFeedback(Text.of("Fastest regular route is %.1f s, from ${fastestRoute.start}".format(fastestRoute.time)))
+            context.source.sendFeedback(Component.nullToEmpty("Fastest regular route is %.1f s, from ${fastestRoute.start}".format(fastestRoute.time)))
         }
 
         // Check if just sprinting there is faster
-        fun checkSprinting(startCoords: Vec3d, homeWarp: HomeWarp? = null) {
+        fun checkSprinting(startCoords: Vec3, homeWarp: HomeWarp? = null) {
             val dim = if (homeWarp != null) {
                 homeWarp.location.dimension
             } else {
-                context.source.player.clientWorld.registryKey.value.path
+                context.source.player.clientLevel.dimension().location().path
             }
             if (checkStringDim(getDim(dest), dim)) {
                 val coords = nrData.network.findAverageStationCoords(dest)
@@ -746,16 +746,16 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                         return
                     }
 
-                    val directTime = sprintTime(startCoords, coords.toBottomCenterPos())
+                    val directTime = sprintTime(startCoords, coords.bottomCenter)
                     if (directTime < (fastestRoute?.time ?: Double.POSITIVE_INFINITY)) {
                         val froute = FastestRoute(PreCalcRoute(0.0, listOf()), dest, directTime, homeWarp != null, homeWarp)
                         fastestRoute = froute
 
                         if (config.debug && !noDebug) {
                             if (homeWarp != null) {
-                                context.source.sendFeedback(Text.of("Sprinting from ${homeWarp.name} is faster, %.1f s".format(froute.time)))
+                                context.source.sendFeedback(Component.nullToEmpty("Sprinting from ${homeWarp.name} is faster, %.1f s".format(froute.time)))
                             } else {
-                                context.source.sendFeedback(Text.of("Sprinting is faster, %.1f s".format(froute.time)))
+                                context.source.sendFeedback(Component.nullToEmpty("Sprinting is faster, %.1f s".format(froute.time)))
                             }
                         }
                     }
@@ -768,13 +768,13 @@ class NguhroutesClient : ClientModInitializer, HudElement {
         fun checkHomeWarp(name: String, homeLocation: SerializableBlockPosDim?) {
             if (homeLocation != null) {
                 val fastestRouteForHome = findFastestRouteOnFoot(
-                    homeLocation.blockpos().toBottomCenterPos(),
+                    homeLocation.blockpos().bottomCenter,
                     HomeWarp(name, homeLocation)
                 )
                 if (config.debug && !noDebug && fastestRouteForHome != null) {
-                    context.source.sendFeedback(Text.of("Fastest regular route from $name is %.1f s".format(fastestRouteForHome.time)))
+                    context.source.sendFeedback(Component.nullToEmpty("Fastest regular route from $name is %.1f s".format(fastestRouteForHome.time)))
                 }
-                checkSprinting(homeLocation.blockpos().toBottomCenterPos(), HomeWarp(name, homeLocation))
+                checkSprinting(homeLocation.blockpos().bottomCenter, HomeWarp(name, homeLocation))
             }
         }
         checkHomeWarp("Home", config.home_location)
@@ -788,9 +788,9 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                     ?: return
                 // Time is the time it takes for the route, plus the time it takes to sprint to the actual station
                 // from the warp, plus 3 seconds as an estimate for typing in and performing the warp
-                val time = route.time + sprintTime(warpCoords.toBottomCenterPos(), firstStopCoords.toBottomCenterPos()) + warpTypingCost - discount
+                val time = route.time + sprintTime(warpCoords.bottomCenter, firstStopCoords.bottomCenter) + warpTypingCost - discount
                 if (config.debug && !noDebug)
-                    context.source.sendFeedback(Text.of("Warping to $code is %.1f s".format(time)))
+                    context.source.sendFeedback(Component.nullToEmpty("Warping to $code is %.1f s".format(time)))
                 if (time < (fastestRoute?.time ?: Double.POSITIVE_INFINITY)) {
                     fastestRoute = FastestRoute(route, code, time, true)
                 }
@@ -823,18 +823,18 @@ class NguhroutesClient : ClientModInitializer, HudElement {
         } else {
             "Started route to $name ($dest)"
         }
-        context.source.sendFeedback(Text.of(msg))
+        context.source.sendFeedback(Component.nullToEmpty(msg))
         sendNextStopMessage(route.stops[0], context)
     }
 
-    private fun tick(clientWorld: ClientWorld) {
+    private fun tick(clientWorld: ClientLevel) {
         currRouteLogic(clientWorld)
         if (tracker != null && tracker!!.active) {
             trackerLogic()
         }
     }
 
-    private fun currRouteLogic(clientWorld: ClientWorld) {
+    private fun currRouteLogic(clientWorld: ClientLevel) {
         val currRoutePair = currRoutePair.get() ?: return
         val currRoute = currRoutePair.first
         val currStop = currRoutePair.second
@@ -842,8 +842,8 @@ class NguhroutesClient : ClientModInitializer, HudElement {
             this.currRoutePair.compareAndSet(currRoutePair, null)
             return
         }
-        val player = MinecraftClient.getInstance().player ?: return
-        val playerCoords = player.blockPos
+        val player = Minecraft.getInstance().player ?: return
+        val playerCoords = player.blockPosition()
         if (distLess(playerCoords, currRoute.stops[currStop].coords, 50) &&
             checkPlayerDim(currRoute.stops[currStop].dimension, clientWorld) &&
             (currStop == 0 || currRoute.stops[currStop].dimension != currRoute.stops[currStop - 1].dimension || distCloser(
@@ -856,70 +856,70 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                 val nextStop = currRoute.stops[currStop + 1]
                 sendNextStopMessage(nextStop)
             } else {
-                sendRouteMessage(Text.of("Route finished!"))
+                sendRouteMessage(Component.nullToEmpty("Route finished!"))
             }
         }
     }
 
     private fun trackerLogic() {
-        val player = MinecraftClient.getInstance().player
+        val player = Minecraft.getInstance().player
         if (player != null) {
-            tracker!!.updatePos(player.blockPos)
+            tracker!!.updatePos(player.blockPosition())
         }
     }
 
-    private fun startMeasuring(player: ClientPlayerEntity) {
-        tracker = Tracker(player.blockPos)
-        player.sendMessage(Text.of("Measuring tracker started"), false)
+    private fun startMeasuring(player: LocalPlayer) {
+        tracker = Tracker(player.blockPosition())
+        player.displayClientMessage(Component.nullToEmpty("Measuring tracker started"), false)
     }
 
-    private fun stopMeasuring(player: ClientPlayerEntity, context: CommandContext<FabricClientCommandSource>?) {
+    private fun stopMeasuring(player: LocalPlayer, context: CommandContext<FabricClientCommandSource>?) {
         val tracker = tracker
         if (tracker == null) {
-            sendError(Text.of("Measuring tracker is not active"), context)
+            sendError(Component.nullToEmpty("Measuring tracker is not active"), context)
             return
         }
-        tracker.stop(player.blockPos)
-        player.sendMessage(Text.of("Measuring tracker stopped"), false)
+        tracker.stop(player.blockPosition())
+        player.displayClientMessage(Component.nullToEmpty("Measuring tracker stopped"), false)
         tracker.copyEndStop()
-        player.sendMessage(Text.of("End stop JSON copied to clipboard"), false)
+        player.displayClientMessage(Component.nullToEmpty("End stop JSON copied to clipboard"), false)
     }
 
-    private fun copyMeasuring(both: Boolean, player: ClientPlayerEntity, context: CommandContext<FabricClientCommandSource>?) {
+    private fun copyMeasuring(both: Boolean, player: LocalPlayer, context: CommandContext<FabricClientCommandSource>?) {
         val tracker = tracker
         if (tracker == null) {
-            sendError(Text.of("Measuring tracker is not active"), context)
+            sendError(Component.nullToEmpty("Measuring tracker is not active"), context)
             return
         }
         if (both) {
             tracker.copyBothStops()
-            player.sendMessage(Text.of("Both stops JSON copied to clipboard"), false)
+            player.displayClientMessage(Component.nullToEmpty("Both stops JSON copied to clipboard"), false)
         } else {
             tracker.copyEndStop()
-            player.sendMessage(Text.of("End stop JSON copied to clipboard"), false)
+            player.displayClientMessage(Component.nullToEmpty("End stop JSON copied to clipboard"), false)
         }
     }
 
     private fun copyBlockCoords(coords: BlockPos) {
-        val clipboard = Clipboard()
+        val clipboard = ClipboardManager()
         clipboard.setClipboard(0, "${coords.x}, ${coords.y}, ${coords.z}")
     }
 
     private fun stationList(context: CommandContext<FabricClientCommandSource>, ngationCode: String) {
         if (ngationCode.length != 2) {
-            context.source.sendError(Text.literal("This command currently only works with 2-letter codes."))
+            context.source.sendError(Component.literal("This command currently only works with 2-letter codes."))
             return
         }
         if (ngationCode[0] == 'X') {
-            context.source.sendError(Text.literal("This command does not work for ŋationless codes (X__)."))
+            context.source.sendError(Component.literal("This command does not work for ŋationless codes (X__)."))
             return
         }
         val nrData = getNRData(context) ?: return
 
-        context.source.sendFeedback(Text.literal("All stations in $ngationCode:")
+        context.source.sendFeedback(Component.literal("All stations in $ngationCode:")
             .setStyle(Style.EMPTY
                 .withBold(true)
-                .withUnderline(true)))
+                .withUnderlined(true)))
         val stations = mutableSetOf<String>()
         for (line in nrData.network.lines) {
             for (stop in line.value.stops) {
@@ -933,7 +933,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
         }
         for (station in stations) {
             val name = nrData.network.stationNames[station]?.getOrNull(0) ?: station
-            context.source.sendFeedback(Text.literal("$name ($station)"))
+            context.source.sendFeedback(Component.literal("$name ($station)"))
         }
     }
 
@@ -941,9 +941,9 @@ class NguhroutesClient : ClientModInitializer, HudElement {
         val nrData = getNRData(context) ?: return
         val name = nrData.network.getNameOrCode(stop.code, stop.nameOverride)
         var text = if (stop.code == null) {
-            Text.literal("Next: $name (")
+            Component.literal("Next: $name (")
         } else {
-            Text.literal("Next: $name (${stop.code}, ")
+            Component.literal("Next: $name (${stop.code}, ")
         }
         val square = getLineColourSquare(stop.lineCode, nrData)
         if (square != null) {
@@ -953,26 +953,26 @@ class NguhroutesClient : ClientModInitializer, HudElement {
         sendRouteMessage(text)
     }
 
-    private fun sendRouteMessage(msg: Text) {
-        val player = MinecraftClient.getInstance().player ?: return
-        player.sendMessage(msg, true)
-        player.sendMessage(msg, false)
+    private fun sendRouteMessage(msg: Component) {
+        val player = Minecraft.getInstance().player ?: return
+        player.displayClientMessage(msg, true)
+        player.displayClientMessage(msg, false)
     }
 
     private fun printRoute(context: CommandContext<FabricClientCommandSource>) {
         val currRoutePair = currRoutePair.get()
         if (currRoutePair == null) {
-            context.source.sendError(Text.literal("No active route"))
+            context.source.sendError(Component.literal("No active route"))
         } else {
             val nrData = getNRData(context) ?: return
-            context.source.sendFeedback(Text.literal("Active route:")
+            context.source.sendFeedback(Component.literal("Active route:")
                 .setStyle(Style.EMPTY
                     .withBold(true)
-                    .withUnderline(true)))
+                    .withUnderlined(true)))
             for (i in currRoutePair.first.stops.indices) {
                 val stop = currRoutePair.first.stops[i]
                 val name = nrData.network.getNameOrCode(stop.code, stop.nameOverride)
-                var text = Text.literal(if (i == currRoutePair.second) "> " else "")
+                var text = Component.literal(if (i == currRoutePair.second) "> " else "")
                 if (stop.code == null) {
                     text = text.append("$name (")
                 } else {
@@ -1009,42 +1009,42 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                 return@Thread
             }
 
-            val mcc = MinecraftClient.getInstance()
-            mcc.toastManager.add(SystemToast.create(
+            val mcc = Minecraft.getInstance()
+            mcc.toastManager.addToast(SystemToast.multiline(
                 mcc,
-                SystemToast.Type(),
-                Text.literal("New ")
-                    .append(Text.literal("NguhRoutes")
+                SystemToast.SystemToastId(),
+                Component.literal("New ")
+                    .append(Component.literal("NguhRoutes")
                         .setStyle(Style.EMPTY
                             .withItalic(true)
                             .withBold(true)))
-                    .append(Text.literal(" Update")
+                    .append(Component.literal(" Update")
                         .setStyle(Style.EMPTY
                             .withItalic(false)
                             .withBold(false))),
-                Text.literal("NguhRoutes")
+                Component.literal("NguhRoutes")
                     .setStyle(Style.EMPTY
                         .withItalic(true)
                         .withBold(true))
-                    .append(Text.literal(" update ${updateInfo.latestVersion} available!")
+                    .append(Component.literal(" update ${updateInfo.latestVersion} available!")
                         .setStyle(Style.EMPTY
                             .withItalic(false)
                             .withBold(false)))
             ))
-            mcc.player?.sendMessage(
-                Text.literal("NguhRoutes")
+            mcc.player?.displayClientMessage(
+                Component.literal("NguhRoutes")
                     .setStyle(Style.EMPTY
                         .withItalic(true)
                         .withBold(true))
-                    .append(Text.literal(" update ${updateInfo.latestVersion} available! ")
+                    .append(Component.literal(" update ${updateInfo.latestVersion} available! ")
                         .setStyle(Style.EMPTY
                             .withItalic(false)
                             .withBold(false))
-                        .append(Text.literal("Link")
+                        .append(Component.literal("Link")
                             .setStyle(Style.EMPTY
                                 .withClickEvent(ClickEvent.OpenUrl(java.net.URI(updateInfo.downloadLink)))
-                                .withUnderline(true)
-                                .withColor(Formatting.BLUE)))),
+                                .withUnderlined(true)
+                                .withColor(ChatFormatting.BLUE)))),
                 false
             )
         }.start()
@@ -1054,11 +1054,11 @@ class NguhroutesClient : ClientModInitializer, HudElement {
      * Returns a coloured text square with the appropriate line colour. Returns null if it is unable to determine
      * the colour. If lineCode is null it immediately returns null.
      */
-    private fun getLineColourSquare(lineCode: String?, nrData: NRData): MutableText? {
+    private fun getLineColourSquare(lineCode: String?, nrData: NRData): MutableComponent? {
         if (lineCode == null) return null
         val lineColour = nrData.network.lines[lineCode]?.colour
         return if (lineColour != null) {
-            Text.literal("■").withColor(lineColour.argb())
+            Component.literal("■").withColor(lineColour.argb())
         } else {
             null
         }
@@ -1072,31 +1072,31 @@ class NguhroutesClient : ClientModInitializer, HudElement {
         val nrData = nrDataLoadError.first
         if (nrData == null && printMessage) {
             if (nrDataLoadError.second == null) {
-                val text = Text.of("Data has not loaded yet.")
+                val text = Component.nullToEmpty("Data has not loaded yet.")
                 sendError(text, context)
             } else {
-                sendError(Text.of("Error when loading:"), context)
-                sendError(Text.of(nrDataLoadError.second), context)
+                sendError(Component.nullToEmpty("Error when loading:"), context)
+                sendError(Component.nullToEmpty(nrDataLoadError.second), context)
             }
             return null
         }
         return nrData
     }
 
-    private fun sendError(text: Text, context: CommandContext<FabricClientCommandSource>? = null) {
+    private fun sendError(text: Component, context: CommandContext<FabricClientCommandSource>? = null) {
         if (context != null) {
             context.source.sendError(text)
         } else {
-            val player = MinecraftClient.getInstance().player ?: return
-            player.sendMessage(text.getWithStyle(Style.EMPTY.withColor(TextColor.fromFormatting(Formatting.RED)))[0], false)
+            val player = Minecraft.getInstance().player ?: return
+            player.displayClientMessage(text.toFlatList(Style.EMPTY.withColor(TextColor.fromLegacyFormat(ChatFormatting.RED)))[0], false)
         }
     }
 
-    private fun checkPlayerDim(dim: String, clientWorld: ClientWorld): Boolean {
-        return clientWorld.registryKey.value == Identifier.of(dim)
+    private fun checkPlayerDim(dim: String, clientWorld: ClientLevel): Boolean {
+        return clientWorld.dimension().location() == ResourceLocation.parse(dim)
     }
 
     private fun checkStringDim(dim: String, otherDim: String): Boolean {
-        return Identifier.of(dim) == Identifier.of(otherDim)
+        return ResourceLocation.parse(dim) == ResourceLocation.parse(otherDim)
     }
 }

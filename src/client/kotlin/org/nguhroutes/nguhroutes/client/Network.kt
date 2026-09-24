@@ -11,7 +11,7 @@ import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import net.minecraft.util.math.BlockPos
+import net.minecraft.core.BlockPos
 import kotlin.collections.iterator
 
 const val supportedNetworkFormatVersion = "7.1"

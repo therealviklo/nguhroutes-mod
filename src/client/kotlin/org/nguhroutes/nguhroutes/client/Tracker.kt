@@ -1,7 +1,7 @@
 package org.nguhroutes.nguhroutes.client
 
-import net.minecraft.client.util.Clipboard
-import net.minecraft.util.math.BlockPos
+import com.mojang.blaze3d.platform.ClipboardManager
+import net.minecraft.core.BlockPos
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
@@ -37,7 +37,7 @@ class Tracker(initialPos: BlockPos) {
             // Divides by 1000 but in two steps so that it rounds to one decimal
             val time = (endTime - startTime) / 100 / 10.0
             val date = ZonedDateTime.now(ZoneOffset.UTC).withNano(0).format(DateTimeFormatter.ISO_INSTANT)
-            val clipboard = Clipboard()
+            val clipboard = ClipboardManager()
             clipboard.setClipboard(0,
                 """
                     |,
@@ -59,7 +59,7 @@ class Tracker(initialPos: BlockPos) {
             // Divides by 1000 but in two steps so that it rounds to one decimal
             val time = (endTime - startTime) / 100 / 10.0
             val date = ZonedDateTime.now(ZoneOffset.UTC).withNano(0).format(DateTimeFormatter.ISO_INSTANT)
-            val clipboard = Clipboard()
+            val clipboard = ClipboardManager()
             clipboard.setClipboard(0,
                 """
                     |{
