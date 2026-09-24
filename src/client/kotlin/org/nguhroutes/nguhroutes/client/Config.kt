@@ -92,10 +92,12 @@ class Config {
                 configFile.toFile().writeText(jsonText)
             } catch (e: Exception) {
                 if (debug) {
-                    Minecraft.getInstance().player?.sendSystemMessage(
-                        Component.literal("NguhRoutes config error when saving: ${e.message}")
-                            .setStyle(Style.EMPTY.withColor(ChatFormatting.RED))
-                    )
+                    Minecraft.getInstance().execute {
+                        Minecraft.getInstance().player?.sendSystemMessage(
+                            Component.literal("NguhRoutes config error when saving: ${e.message}")
+                                .setStyle(Style.EMPTY.withColor(ChatFormatting.RED))
+                        )
+                    }
                 }
             }
         }
@@ -107,19 +109,19 @@ class Config {
         fun addBooleanSetting(x: KMutableProperty1<Config, Boolean>) {
             builder = builder.then(ClientCommands.literal(x.name)
                 .executes { context ->
-                    context.source.sendFeedback(Component.nullToEmpty("Value of ${x.name}: ${x.get(this)}"))
+                    sendFeedback(context, Component.nullToEmpty("Value of ${x.name}: ${x.get(this)}"))
                     1
                 }
                 .then(ClientCommands.literal("true")
                     .executes { context ->
                         x.set(this, true)
-                        context.source.sendFeedback(Component.nullToEmpty("Set ${x.name} to: true"))
+                        sendFeedback(context, Component.nullToEmpty("Set ${x.name} to: true"))
                         1
                     })
                 .then(ClientCommands.literal("false")
                     .executes { context ->
                         x.set(this, false)
-                        context.source.sendFeedback(Component.nullToEmpty("Set ${x.name} to: false"))
+                        sendFeedback(context, Component.nullToEmpty("Set ${x.name} to: false"))
                         1
                     }))
         }
@@ -136,13 +138,13 @@ class Config {
         fun addHomeArg(home: String, setHome: (SerializableBlockPosDim?) -> Unit, getHome: () -> SerializableBlockPosDim?) {
             builder = builder.then(ClientCommands.literal(home)
                 .executes { context ->
-                    context.source.sendFeedback(Component.nullToEmpty("Value of $home: ${getHome()}"))
+                    sendFeedback(context, Component.nullToEmpty("Value of $home: ${getHome()}"))
                     1
                 }
                 .then(ClientCommands.literal("clear")
                     .executes { context ->
                         setHome(null)
-                        context.source.sendFeedback(Component.nullToEmpty("Cleared $home location"))
+                        sendFeedback(context, Component.nullToEmpty("Cleared $home location"))
                         1
                     })
                 .then(ClientCommands.argument("x", CoordinateArgumentType.coordinate())
@@ -153,7 +155,7 @@ class Config {
                                 val y = CoordinateArgumentType.getCoordinate(context, "y", context.source.player.y).toInt()
                                 val z = CoordinateArgumentType.getCoordinate(context, "z", context.source.player.z).toInt()
                                 setHome(SerializableBlockPosDim(x, y, z, "overworld"))
-                                context.source.sendFeedback(Component.nullToEmpty("Set $home to $x $y $z"))
+                                sendFeedback(context, Component.nullToEmpty("Set $home to $x $y $z"))
                                 1
                             }
                             .then(ClientCommands.literal("nether")
@@ -162,7 +164,7 @@ class Config {
                                     val y = CoordinateArgumentType.getCoordinate(context, "y", context.source.player.y).toInt()
                                     val z = CoordinateArgumentType.getCoordinate(context, "z", context.source.player.z).toInt()
                                     setHome(SerializableBlockPosDim(x, y, z, "the_nether"))
-                                    context.source.sendFeedback(Component.nullToEmpty("Set $home to $x $y $z (Nether)"))
+                                    sendFeedback(context, Component.nullToEmpty("Set $home to $x $y $z (Nether)"))
                                     1
                                 }))))
                 .then(ClientCommands.literal("here")
@@ -170,7 +172,7 @@ class Config {
                         val dim = context.source.player.level().dimension().identifier().path
                         val pos = SerializableBlockPosDim(context.source.player.blockPosition(), dim)
                         setHome(pos)
-                        context.source.sendFeedback(Component.nullToEmpty("Set $home to $pos" + if (dim != "overworld") " (${dimName(dim)})" else ""))
+                        sendFeedback(context, Component.nullToEmpty("Set $home to $pos" + if (dim != "overworld") " (${dimName(dim)})" else ""))
                         1
                     }))
         }

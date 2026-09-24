@@ -1,8 +1,13 @@
 package org.nguhroutes.nguhroutes.client
 
+import com.mojang.brigadier.context.CommandContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource
+import net.minecraft.client.Minecraft
+import net.minecraft.client.player.LocalPlayer
 import net.minecraft.core.BlockPos
+import net.minecraft.network.chat.Component
 import net.minecraft.world.phys.Vec3
 import java.net.URI
 import kotlin.math.roundToInt
@@ -85,4 +90,31 @@ fun dimName(identifier: String): String {
  */
 fun sameSideOfCeil(y1: Double, y2: Double): Boolean {
     return !((y1 < 128.0) xor (y2 < 128.0))
+}
+
+/**
+ * Sends a message to chat from the main thread
+ */
+fun sendFeedback(context: CommandContext<FabricClientCommandSource>, msg: Component) {
+    Minecraft.getInstance().execute {
+        context.source.sendFeedback(msg)
+    }
+}
+
+/**
+ * Sends a chat message to the player from the main thread
+ */
+fun sendPlayerSystemMessage(player: LocalPlayer, msg: Component) {
+    Minecraft.getInstance().execute {
+        player.sendSystemMessage(msg)
+    }
+}
+
+/**
+ * Sends an error message to chat from the main thread
+ */
+fun sendError( context: CommandContext<FabricClientCommandSource>, msg: Component) {
+    Minecraft.getInstance().execute {
+        context.source.sendError(msg)
+    }
 }

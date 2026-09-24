@@ -98,7 +98,9 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                 }
 
                 if (won && feedback != null) {
-                    feedback.sendSystemMessage(Component.nullToEmpty("Finished loading NguhRoutes data!"))
+                    Minecraft.getInstance().execute {
+                        feedback.sendSystemMessage(Component.nullToEmpty("Finished loading NguhRoutes data!"))
+                    }
                     nrdpr?.sendReportMessage(feedback)
                 }
             } catch (e: Exception) {
@@ -143,7 +145,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                 .executes { context ->
                     val container = FabricLoader.getInstance().getModContainer("nguhroutes").orElse(null)
                     val version = container?.metadata?.version?.friendlyString ?: "(unknown version)"
-                    context.source.sendFeedback(
+                    sendFeedback(context, 
                         Component.literal("NguhRoutes")
                         .setStyle(Style.EMPTY
                             .withItalic(true)
@@ -154,20 +156,20 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                                 .withItalic(false)
                                 .withBold(true)
                                 .withUnderlined(true))))
-                    context.source.sendFeedback(Component.nullToEmpty("Supported format version: $supportedNetworkFormatVersion"))
+                    sendFeedback(context, Component.nullToEmpty("Supported format version: $supportedNetworkFormatVersion"))
                     val nrDataLoadError = this@NguhroutesClient.nrDataLoadError.get()
                     val nrData = nrDataLoadError.first
                     val loadError = nrDataLoadError.second
                     if (nrData!= null) {
-                        context.source.sendFeedback(Component.literal("JSON data has been loaded"))
+                        sendFeedback(context, Component.literal("JSON data has been loaded"))
                     } else if (loadError != null) {
-                        context.source.sendFeedback(Component.literal("An error occurred when loading JSON data"))
+                        sendFeedback(context, Component.literal("An error occurred when loading JSON data"))
                     } else {
-                        context.source.sendFeedback(Component.literal("JSON data is still loading"))
+                        sendFeedback(context, Component.literal("JSON data is still loading"))
                     }
                     if (loadError != null) {
-                        context.source.sendFeedback(Component.literal("Error:"))
-                        context.source.sendError(Component.literal(loadError))
+                        sendFeedback(context, Component.literal("Error:"))
+                        sendError(context, Component.literal(loadError))
                     }
                     1
                 })
@@ -208,7 +210,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                 .executes { context ->
                     val currRoutePair = currRoutePair.get()
                     if (currRoutePair == null) {
-                        context.source.sendError(Component.literal("No active route"))
+                        sendError(context, Component.literal("No active route"))
                     } else {
                         val last = currRoutePair.first.stops.last()
                         if (last.code == null) {
@@ -227,19 +229,19 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                 })
             .then(ClientCommands.literal("reload")
                 .executes { context ->
-                    context.source.sendFeedback(Component.nullToEmpty("Reloading NguhRoutes data..."))
+                    sendFeedback(context, Component.nullToEmpty("Reloading NguhRoutes data..."))
                     loadJson(config.nonether_by_default, context.source.player)
                     1
                 }
                 .then(ClientCommands.literal("nonether")
                     .executes { context ->
-                        context.source.sendFeedback(Component.nullToEmpty("Reloading NguhRoutes data..."))
+                        sendFeedback(context, Component.nullToEmpty("Reloading NguhRoutes data..."))
                         loadJson(true, context.source.player)
                         1
                     })
                 .then(ClientCommands.literal("nether")
                     .executes { context ->
-                        context.source.sendFeedback(Component.nullToEmpty("Reloading NguhRoutes data..."))
+                        sendFeedback(context, Component.nullToEmpty("Reloading NguhRoutes data..."))
                         loadJson(false, context.source.player)
                         1
                     }))
@@ -298,14 +300,14 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                                     finds.add(longestNameFind)
                             }
                             if (finds.isEmpty()) {
-                                context.source.sendFeedback(Component.nullToEmpty("No search results."))
+                                sendFeedback(context, Component.nullToEmpty("No search results."))
                             } else {
-                                context.source.sendFeedback(Component.literal("Search Results:")
+                                sendFeedback(context, Component.literal("Search Results:")
                                     .setStyle(Style.EMPTY
                                         .withBold(true)
                                         .withUnderlined(true)))
                                 for (result in finds) {
-                                    context.source.sendFeedback(result)
+                                    sendFeedback(context, result)
                                 }
                             }
                         }.start()
@@ -335,7 +337,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                 .then(ClientCommands.literal("coords")
                     .executes { context ->
                         copyBlockCoords(context.source.player.blockPosition())
-                        context.source.sendFeedback(Component.nullToEmpty("Copied current coordinates to clipboard"))
+                        sendFeedback(context, Component.nullToEmpty("Copied current coordinates to clipboard"))
                         1
                     }))
             .then(config.configCommand()),
@@ -467,7 +469,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                 val player = client.player
                 if (player != null) {
                     copyBlockCoords(player.blockPosition())
-                    player.sendSystemMessage(Component.nullToEmpty("Copied current coordinates to clipboard"))
+                    sendPlayerSystemMessage(player, Component.nullToEmpty("Copied current coordinates to clipboard"))
                 }
             }
             while (bindingToggleWaypoints.consumeClick()) {
@@ -583,10 +585,10 @@ class NguhroutesClient : ClientModInitializer, HudElement {
 
         val route = nrData.preCalcRoutes.routes[Pair(start, dest)]
         if (route == null) {
-            context.source.sendError(Component.literal("Could not find route."))
+            sendError(context, Component.literal("Could not find route."))
             return
         }
-        context.source.sendFeedback(Component.nullToEmpty("Time: %.1f s".format(route.time)))
+        sendFeedback(context, Component.nullToEmpty("Time: %.1f s".format(route.time)))
         val routeObj = Route(start, route.conns, nrData.network)
 
         setRoute(context, nrData, routeObj, dest)
@@ -598,14 +600,14 @@ class NguhroutesClient : ClientModInitializer, HudElement {
         Thread {
             val playerPos = context.source?.player?.position()
             if (playerPos == null) {
-                context.source.sendError(Component.literal("Could not get player position."))
+                sendError(context, Component.literal("Could not get player position."))
                 return@Thread
             }
 
             val fastestRouteWithCost = findRouteFromCoords(context, nrData, playerPos, dest)
 
             if (fastestRouteWithCost == null) {
-                context.source.sendError(Component.literal("Could not find route."))
+                sendError(context, Component.literal("Could not find route."))
                 return@Thread
             }
 
@@ -618,11 +620,11 @@ class NguhroutesClient : ClientModInitializer, HudElement {
         Thread {
             val playerPos = context.source?.player?.position()
             if (playerPos == null) {
-                context.source.sendError(Component.literal("Could not get player position."))
+                sendError(context, Component.literal("Could not get player position."))
                 return@Thread
             }
 
-            context.source.sendFeedback(Component.nullToEmpty("Finding route to coordinate..."))
+            sendFeedback(context, Component.nullToEmpty("Finding route to coordinate..."))
 
             var fastestRouteWithCost = RouteWithCost(
                 Route(BlockPos.containing(destCoords), dimension), sprintTime(playerPos, destCoords)
@@ -729,15 +731,15 @@ class NguhroutesClient : ClientModInitializer, HudElement {
             if (nrData.network.stationNames.containsKey(dest)) {
                 // This is the case for where a station is in the "stations" property in network.jsonc,
                 // but is not actually anywhere in the network.
-                context.source.sendError(Component.literal("Could not find route to station \"${dest}\"."))
+                sendError(context, Component.literal("Could not find route to station \"${dest}\"."))
             } else {
-                context.source.sendError(Component.literal("Could not find station \"${dest}\"."))
+                sendError(context, Component.literal("Could not find station \"${dest}\"."))
             }
             return null
         }
 
         if (config.debug && !noDebug && fastestRoute != null) {
-            context.source.sendFeedback(Component.nullToEmpty("Fastest regular route is %.1f s, from ${fastestRoute.start}".format(fastestRoute.time)))
+            sendFeedback(context, Component.nullToEmpty("Fastest regular route is %.1f s, from ${fastestRoute.start}".format(fastestRoute.time)))
         }
 
         // Check if just sprinting there is faster
@@ -762,9 +764,9 @@ class NguhroutesClient : ClientModInitializer, HudElement {
 
                         if (config.debug && !noDebug) {
                             if (homeWarp != null) {
-                                context.source.sendFeedback(Component.nullToEmpty("Sprinting from ${homeWarp.name} is faster, %.1f s".format(froute.time)))
+                                sendFeedback(context, Component.nullToEmpty("Sprinting from ${homeWarp.name} is faster, %.1f s".format(froute.time)))
                             } else {
-                                context.source.sendFeedback(Component.nullToEmpty("Sprinting is faster, %.1f s".format(froute.time)))
+                                sendFeedback(context, Component.nullToEmpty("Sprinting is faster, %.1f s".format(froute.time)))
                             }
                         }
                     }
@@ -781,7 +783,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                     HomeWarp(name, homeidentifier)
                 )
                 if (config.debug && !noDebug && fastestRouteForHome != null) {
-                    context.source.sendFeedback(Component.nullToEmpty("Fastest regular route from $name is %.1f s".format(fastestRouteForHome.time)))
+                    sendFeedback(context, Component.nullToEmpty("Fastest regular route from $name is %.1f s".format(fastestRouteForHome.time)))
                 }
                 checkSprinting(Vec3.atBottomCenterOf(homeidentifier.blockpos()), HomeWarp(name, homeidentifier))
             }
@@ -799,7 +801,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                 // from the warp, plus 3 seconds as an estimate for typing in and performing the warp
                 val time = route.time + sprintTime(Vec3.atBottomCenterOf(warpCoords), Vec3.atBottomCenterOf(firstStopCoords)) + warpTypingCost - discount
                 if (config.debug && !noDebug)
-                    context.source.sendFeedback(Component.nullToEmpty("Warping to $code is %.1f s".format(time)))
+                    sendFeedback(context, Component.nullToEmpty("Warping to $code is %.1f s".format(time)))
                 if (time < (fastestRoute?.time ?: Double.POSITIVE_INFINITY)) {
                     fastestRoute = FastestRoute(route, code, time, true)
                 }
@@ -832,7 +834,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
         } else {
             "Started route to $name ($dest)"
         }
-        context.source.sendFeedback(Component.nullToEmpty(msg))
+        sendFeedback(context, Component.nullToEmpty(msg))
         sendNextStopMessage(route.stops[0], context)
     }
 
@@ -879,7 +881,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
 
     private fun startMeasuring(player: LocalPlayer) {
         tracker = Tracker(player.blockPosition())
-        player.sendSystemMessage(Component.nullToEmpty("Measuring tracker started"))
+        sendPlayerSystemMessage(player, Component.nullToEmpty("Measuring tracker started"))
     }
 
     private fun stopMeasuring(player: LocalPlayer, context: CommandContext<FabricClientCommandSource>?) {
@@ -889,9 +891,9 @@ class NguhroutesClient : ClientModInitializer, HudElement {
             return
         }
         tracker.stop(player.blockPosition())
-        player.sendSystemMessage(Component.nullToEmpty("Measuring tracker stopped"))
+        sendPlayerSystemMessage(player, Component.nullToEmpty("Measuring tracker stopped"))
         tracker.copyEndStop()
-        player.sendSystemMessage(Component.nullToEmpty("End stop JSON copied to clipboard"))
+        sendPlayerSystemMessage(player, Component.nullToEmpty("End stop JSON copied to clipboard"))
     }
 
     private fun copyMeasuring(both: Boolean, player: LocalPlayer, context: CommandContext<FabricClientCommandSource>?) {
@@ -902,10 +904,10 @@ class NguhroutesClient : ClientModInitializer, HudElement {
         }
         if (both) {
             tracker.copyBothStops()
-            player.sendSystemMessage(Component.nullToEmpty("Both stops JSON copied to clipboard"))
+            sendPlayerSystemMessage(player, Component.nullToEmpty("Both stops JSON copied to clipboard"))
         } else {
             tracker.copyEndStop()
-            player.sendSystemMessage(Component.nullToEmpty("End stop JSON copied to clipboard"))
+            sendPlayerSystemMessage(player, Component.nullToEmpty("End stop JSON copied to clipboard"))
         }
     }
 
@@ -916,16 +918,16 @@ class NguhroutesClient : ClientModInitializer, HudElement {
 
     private fun stationList(context: CommandContext<FabricClientCommandSource>, ngationCode: String) {
         if (ngationCode.length != 2) {
-            context.source.sendError(Component.literal("This command currently only works with 2-letter codes."))
+            sendError(context, Component.literal("This command currently only works with 2-letter codes."))
             return
         }
         if (ngationCode[0] == 'X') {
-            context.source.sendError(Component.literal("This command does not work for ŋationless codes (X__)."))
+            sendError(context, Component.literal("This command does not work for ŋationless codes (X__)."))
             return
         }
         val nrData = getNRData(context) ?: return
 
-        context.source.sendFeedback(Component.literal("All stations in $ngationCode:")
+        sendFeedback(context, Component.literal("All stations in $ngationCode:")
             .setStyle(Style.EMPTY
                 .withBold(true)
                 .withUnderlined(true)))
@@ -942,7 +944,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
         }
         for (station in stations) {
             val name = nrData.network.stationNames[station]?.getOrNull(0) ?: station
-            context.source.sendFeedback(Component.literal("$name ($station)"))
+            sendFeedback(context, Component.literal("$name ($station)"))
         }
     }
 
@@ -965,16 +967,16 @@ class NguhroutesClient : ClientModInitializer, HudElement {
     private fun sendRouteMessage(msg: Component) {
         val player = Minecraft.getInstance().player ?: return
         player.sendOverlayMessage(msg)
-        player.sendSystemMessage(msg)
+        sendPlayerSystemMessage(player, msg)
     }
 
     private fun printRoute(context: CommandContext<FabricClientCommandSource>) {
         val currRoutePair = currRoutePair.get()
         if (currRoutePair == null) {
-            context.source.sendError(Component.literal("No active route"))
+            sendError(context, Component.literal("No active route"))
         } else {
             val nrData = getNRData(context) ?: return
-            context.source.sendFeedback(Component.literal("Active route:")
+            sendFeedback(context, Component.literal("Active route:")
                 .setStyle(Style.EMPTY
                     .withBold(true)
                     .withUnderlined(true)))
@@ -1005,7 +1007,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                     }
                     text = text.append(")")
                 }
-                context.source.sendFeedback(text)
+                sendFeedback(context, text)
             }
         }
     }
@@ -1039,21 +1041,23 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                             .withItalic(false)
                             .withBold(false)))
             ))
-            mcc.player?.sendSystemMessage(
-                Component.literal("NguhRoutes")
-                    .setStyle(Style.EMPTY
-                        .withItalic(true)
-                        .withBold(true))
-                    .append(Component.literal(" update ${updateInfo.latestVersion} available! ")
+            val player = mcc.player
+            if (player != null) {
+                sendPlayerSystemMessage(player,
+                    Component.literal("NguhRoutes")
                         .setStyle(Style.EMPTY
-                            .withItalic(false)
-                            .withBold(false))
-                        .append(Component.literal("Link")
+                            .withItalic(true)
+                            .withBold(true))
+                        .append(Component.literal(" update ${updateInfo.latestVersion} available! ")
                             .setStyle(Style.EMPTY
-                                .withClickEvent(ClickEvent.OpenUrl(java.net.URI(updateInfo.downloadLink)))
-                                .withUnderlined(true)
-                                .withColor(ChatFormatting.BLUE))))
-            )
+                                .withItalic(false)
+                                .withBold(false))
+                            .append(Component.literal("Link")
+                                .setStyle(Style.EMPTY
+                                    .withClickEvent(ClickEvent.OpenUrl(java.net.URI(updateInfo.downloadLink)))
+                                    .withUnderlined(true)
+                                    .withColor(ChatFormatting.BLUE)))))
+            }
         }.start()
     }
 
@@ -1092,10 +1096,10 @@ class NguhroutesClient : ClientModInitializer, HudElement {
 
     private fun sendError(text: Component, context: CommandContext<FabricClientCommandSource>? = null) {
         if (context != null) {
-            context.source.sendError(text)
+            sendError(context, text)
         } else {
             val player = Minecraft.getInstance().player ?: return
-            player.sendSystemMessage(text.toFlatList(Style.EMPTY.withColor(TextColor.fromLegacyFormat(ChatFormatting.RED)))[0])
+            sendPlayerSystemMessage(player, text.toFlatList(Style.EMPTY.withColor(TextColor.fromLegacyFormat(ChatFormatting.RED)))[0])
         }
     }
 
