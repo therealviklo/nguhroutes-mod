@@ -477,11 +477,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
             }
             while (bindingConfigScreen.consumeClick()) {
                 val currentScreen = Minecraft.getInstance().gui.screen()
-                if (currentScreen == null) {
-                    println("NguhRoutes Warning: no current screen to return to")
-                } else {
-                    Minecraft.getInstance().gui.setScreen(ConfigScreen(config, currentScreen))
-                }
+                Minecraft.getInstance().gui.setScreen(ConfigScreen(config, currentScreen))
             }
         }
 

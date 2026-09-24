@@ -1,14 +1,15 @@
 package org.nguhroutes.nguhroutes.client
 
 import net.minecraft.client.Minecraft
+import net.minecraft.client.gui.screens.PauseScreen
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.client.gui.screens.options.OptionsSubScreen
 import net.minecraft.network.chat.Style
 import net.minecraft.network.chat.Component
 
 
-class ConfigScreen(val config: Config, parent: Screen) : OptionsSubScreen(
-    parent,
+class ConfigScreen(val config: Config, val parent: Screen?) : OptionsSubScreen(
+    parent ?: PauseScreen(true),
     Minecraft.getInstance().options,
     Component.literal("NguhRoutes")
         .setStyle(Style.EMPTY
@@ -24,5 +25,9 @@ class ConfigScreen(val config: Config, parent: Screen) : OptionsSubScreen(
             list?.addSmall(*config.screenOptions().toTypedArray())
             list?.addSmall(config.otherWidgets(this))
         }
+    }
+
+    override fun onClose() {
+        minecraft.gui.setScreen(parent)
     }
 }
