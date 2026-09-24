@@ -7,7 +7,7 @@ import net.minecraft.network.chat.Style
 import net.minecraft.network.chat.Component
 
 
-class ConfigScreen(val config: Config, parent: Screen?) : OptionsSubScreen(
+class ConfigScreen(val config: Config, parent: Screen) : OptionsSubScreen(
     parent,
     Minecraft.getInstance().options,
     Component.literal("NguhRoutes")

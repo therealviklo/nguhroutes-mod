@@ -1,6 +1,7 @@
 package org.nguhroutes.nguhroutes.client
 
 import net.minecraft.core.BlockPos
+import net.minecraft.world.phys.Vec3
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicReference
@@ -181,7 +182,7 @@ class PreCalcRoutes {
                                 "On foot",
                                 coordsA,
                                 coordsB,
-                                walkTime(coordsA.bottomCenter, coordsB.bottomCenter),
+                                walkTime(Vec3.atBottomCenterOf(coordsA), Vec3.atBottomCenterOf(coordsB)),
                                 reverseDirection = false,
                                 averagedCoords = true
                             )
@@ -388,7 +389,7 @@ fun calcExtraCost(arriveConn: Connection?, departConn: Connection?): Double {
         } else {
             departConn.fromCoords
         }
-        val wt = walkTime(toCoords.bottomCenter, fromCoords.bottomCenter)
+        val wt = walkTime(Vec3.atBottomCenterOf(toCoords), Vec3.atBottomCenterOf(fromCoords))
         if (wt < 1.0) { // Assume that a time of less than 1 seconds means no transfer
             wt
         } else {

@@ -38,7 +38,7 @@ class Tracker(initialPos: BlockPos) {
             val time = (endTime - startTime) / 100 / 10.0
             val date = ZonedDateTime.now(ZoneOffset.UTC).withNano(0).format(DateTimeFormatter.ISO_INSTANT)
             val clipboard = ClipboardManager()
-            clipboard.setClipboard(0,
+            clipboard.setClipboard(
                 """
                     |,
                     |					{
@@ -60,7 +60,7 @@ class Tracker(initialPos: BlockPos) {
             val time = (endTime - startTime) / 100 / 10.0
             val date = ZonedDateTime.now(ZoneOffset.UTC).withNano(0).format(DateTimeFormatter.ISO_INSTANT)
             val clipboard = ClipboardManager()
-            clipboard.setClipboard(0,
+            clipboard.setClipboard(
                 """
                     |{
                     |						"code": "",

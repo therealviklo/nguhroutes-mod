@@ -62,7 +62,7 @@ class NRDataPerformanceReport {
     fun sendReportMessage(feedback: LocalPlayer) {
         val report = getReport()
         for (line in report) {
-            feedback.displayClientMessage(Component.nullToEmpty(line), false)
+            feedback.sendSystemMessage(Component.nullToEmpty(line))
         }
     }
 }
