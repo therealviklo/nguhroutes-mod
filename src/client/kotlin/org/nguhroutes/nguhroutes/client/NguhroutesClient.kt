@@ -493,7 +493,7 @@ class NguhroutesClient : ClientModInitializer, HudElement {
         deltaTracker: DeltaTracker
     ) {
         if (!waypointsEnabled) return
-        val nrData = getNRData(null) ?: return
+        val nrData = getNRData(null, false) ?: return
         val currRoutePair = currRoutePair.get() ?: return
         val currRoute = currRoutePair.first
         val currStop = currRoutePair.second
