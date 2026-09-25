@@ -248,7 +248,7 @@ class PreCalcRoutes {
         val pool = Executors.newFixedThreadPool(numThreads) { r ->
             Thread(r, "nguhroutes-precalc-worker").apply { isDaemon = true }
         }
-        try {
+        pool.use { pool ->
             // Main loop
             for (k in 0..<stationKeys.size) {
                 val numThreadsInProgress = CountDownLatch(numThreads)
@@ -301,8 +301,6 @@ class PreCalcRoutes {
                 }
                 numThreadsInProgress.await()
             }
-        } finally {
-            pool.close()
         }
         nrdpr?.pathFindingAlgoMainLoopTime?.stop()
 
