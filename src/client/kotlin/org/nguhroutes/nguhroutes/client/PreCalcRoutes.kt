@@ -246,59 +246,64 @@ class PreCalcRoutes {
         /** The size of the range of values of i that one thread deals with */
         val threadBlockSize = stationsMut.size / numThreads
         val pool = Executors.newFixedThreadPool(numThreads)
-        // Main loop
-        for (k in 0..<stationKeys.size) {
-            val numThreadsInProgress = CountDownLatch(numThreads)
-            for (threadNum in 0..<numThreads) {
-                // Each thread is assigned part of the range of values of i
-                val start = threadNum * threadBlockSize
-                // The final thread may need to handle a bit more than the other threads if stationsMut.size is not
-                // divisible by numThreads
-                val end = if (threadNum == numThreads - 1) {
-                    stationsMut.size
-                } else {
-                    start + threadBlockSize
-                }
-                pool.submit {
-                    for (i in start..<end) {
-                        for (j in 0..<stationKeys.size) {
-                            // The fact that there are three reads from pathInfo here shouldn't be a problem because
-                            // only kj can be modified by another thread. The only writes to pathInfo happening at this
-                            // time are to ij (further down), and since the range of values of i is split across the
-                            // threads, only this thread could be modifying paths that have i as the first station. If
-                            // kj has been modified when the read happens, it will as I understand it only be
-                            // beneficial to this thread, in that the thread finds a shorter route earlier than it
-                            // otherwise would have.
-                            val ij = pathInfo[i][j].get()
-                            val ik = pathInfo[i][k].get()
-                            val kj = pathInfo[k][j].get()
-                            val dij = ij.dist
-                            val dik = ik.dist
-                            val dkj = kj.dist
+        try {
+            // Main loop
+            for (k in 0..<stationKeys.size) {
+                val numThreadsInProgress = CountDownLatch(numThreads)
+                for (threadNum in 0..<numThreads) {
+                    // Each thread is assigned part of the range of values of i
+                    val start = threadNum * threadBlockSize
+                    // The final thread may need to handle a bit more than the other threads if stationsMut.size is not
+                    // divisible by numThreads
+                    val end = if (threadNum == numThreads - 1) {
+                        stationsMut.size
+                    } else {
+                        start + threadBlockSize
+                    }
+                    pool.submit {
+                        for (i in start..<end) {
+                            for (j in 0..<stationKeys.size) {
+                                // The fact that there are three reads from pathInfo here shouldn't be a problem because
+                                // only kj can be modified by another thread. The only writes to pathInfo happening at this
+                                // time are to ij (further down), and since the range of values of i is split across the
+                                // threads, only this thread could be modifying paths that have i as the first station. If
+                                // kj has been modified when the read happens, it will as I understand it only be
+                                // beneficial to this thread, in that the thread finds a shorter route earlier than it
+                                // otherwise would have.
+                                val ij = pathInfo[i][j].get()
+                                val ik = pathInfo[i][k].get()
+                                val kj = pathInfo[k][j].get()
+                                val dij = ij.dist
+                                val dik = ik.dist
+                                val dkj = kj.dist
 
-                            // Extra cost for transferring from one line to another at a station.
-                            // Currently, staying on the same line incurs no extra cost since the distance should be zero.
-                            val arriveConn = ik.prev?.second
-                            val departConn = kj.first
-                            val extraCost = calcExtraCost(arriveConn, departConn)
+                                // Extra cost for transferring from one line to another at a station.
+                                // Currently, staying on the same line incurs no extra cost since the distance should be zero.
+                                val arriveConn = ik.prev?.second
+                                val departConn = kj.first
+                                val extraCost = calcExtraCost(arriveConn, departConn)
 
-                            if (dij > dik + dkj + extraCost) {
-                                pathInfo[i][j].set(
-                                    FWPathInfo(
-                                        dik + dkj + extraCost,
-                                        kj.prev,
-                                        ik.first
+                                if (dij > dik + dkj + extraCost) {
+                                    pathInfo[i][j].set(
+                                        FWPathInfo(
+                                            dik + dkj + extraCost,
+                                            kj.prev,
+                                            ik.first
+                                        )
                                     )
-                                )
+                                }
                             }
                         }
+                        numThreadsInProgress.countDown()
                     }
-                    numThreadsInProgress.countDown()
                 }
+                numThreadsInProgress.await()
             }
-            numThreadsInProgress.await()
+        } finally {
+            pool.close()
         }
         nrdpr?.pathFindingAlgoMainLoopTime?.stop()
+
         nrdpr?.pathFindingAlgoPathReconstructionTime?.start()
         // Path reconstruction
         for (start in 0..<stationKeys.size) {
