@@ -245,7 +245,9 @@ class PreCalcRoutes {
         val numThreads = Runtime.getRuntime().availableProcessors()
         /** The size of the range of values of i that one thread deals with */
         val threadBlockSize = stationsMut.size / numThreads
-        val pool = Executors.newFixedThreadPool(numThreads)
+        val pool = Executors.newFixedThreadPool(numThreads) { r ->
+            Thread(r, "nguhroutes-precalc-worker").apply { isDaemon = true }
+        }
         try {
             // Main loop
             for (k in 0..<stationKeys.size) {
