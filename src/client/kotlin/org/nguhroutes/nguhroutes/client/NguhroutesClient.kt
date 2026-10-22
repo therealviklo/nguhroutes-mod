@@ -53,7 +53,8 @@ class NguhroutesClient : ClientModInitializer, HudElement {
     private val loadLock = Any()
 
     init {
-        // config is not available here so this is run later a second time if nonether_by_default is enabled.
+        // config is not available here so this is run later a second time if nonether_by_default is enabled, or a
+        // custom network file is used.
         loadJson(false)
     }
 
@@ -76,7 +77,9 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                 nrdpr?.totalTime?.start()
 
                 nrdpr?.downloadTime?.start()
-                val networkJson = downloadJson("https://mc.nguh.org/wiki/Data:NguhRoutes/network.json?action=raw")
+                // I don't understand why but config.network_file is actually null sometimes so we have to provide
+                // the default value like this
+                val networkJson = downloadJson(config.network_file ?: defaultNetworkFile)
                 nrdpr?.downloadTime?.stop()
 
                 nrdpr?.networkTime?.start()
@@ -137,6 +140,10 @@ class NguhroutesClient : ClientModInitializer, HudElement {
         // config is not available when loadJson is first run so this needs to be run a second time here
         if (config.nonether_by_default) {
             loadJson(true)
+        } else if (config.network_file != defaultNetworkFile) {
+            // Also needs to be rerun if a custom network file is used. If both a custom network file is used and
+            // noNether is enabled, then the first case already handles this.
+            loadJson(false)
         }
 
         // Commands

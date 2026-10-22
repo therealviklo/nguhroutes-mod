@@ -18,6 +18,8 @@
   "config.nguhroutes.set_bed_location": "Set Bed Location",
   "config.nguhroutes.set_home_location": "Set Home Location",
 
+  "config.nguhroutes.empty_string_hint": "(Default value will be used)",
+
   "config.nguhroutes.debug": "Debug Mode",
   "config.nguhroutes.debug.tooltip": "Outputs debug information in chat when using certain features.",
   "config.nguhroutes.open_home_bed_config": "Open Home/Bed Config",
@@ -25,6 +27,8 @@
   "config.nguhroutes.update_notifications.tooltip": "Shows a notification in chat whenever a mod update is available.",
   "config.nguhroutes.your_doom": "your_doom Warp",
   "config.nguhroutes.your_doom.tooltip": "If enabled, the your_doom warp will be recommended if warping to it is faster.",
+  "config.nguhroutes.network_file": "Custom Network File",
+  "config.nguhroutes.network_file.tooltip": "The URL to the JSON file to be used for the data for all the lines, stations etc. Reload is required for change to take effect.",
   "config.nguhroutes.nonether_by_default": "Nonether As Default",
   "config.nguhroutes.nonether_by_default.tooltip": "If enabled, interdimensional transfers are not recommended by default. Can be temporarily overridden using \"/nr reload nether\" and \"/nr reload nonether\". Changing this option does not automatically perform a reload, so a manual reload is required for this to take effect."
 }

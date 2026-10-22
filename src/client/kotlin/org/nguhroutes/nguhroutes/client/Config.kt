@@ -1,5 +1,6 @@
 package org.nguhroutes.nguhroutes.client
 
+import com.mojang.brigadier.arguments.StringArgumentType
 import com.mojang.brigadier.builder.LiteralArgumentBuilder
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -15,6 +16,8 @@ import net.minecraft.client.OptionInstance
 import net.minecraft.network.chat.Style
 import net.minecraft.network.chat.Component
 import net.minecraft.ChatFormatting
+import net.minecraft.client.gui.components.EditBox
+import net.minecraft.client.gui.components.StringWidget
 import net.minecraft.core.BlockPos
 import java.util.concurrent.Executors
 import kotlin.collections.mutableListOf
@@ -28,6 +31,8 @@ var config = Config()
 
 private val jsonFormat = Json { ignoreUnknownKeys = true }
 private val executor = Executors.newSingleThreadExecutor()
+
+val defaultNetworkFile = "https://mc.nguh.org/wiki/Data:NguhRoutes/network.json?action=raw"
 
 @Serializable
 class SerializableBlockPosDim(val x: Int, val y: Int, val z: Int, val dimension: String) {
@@ -71,6 +76,11 @@ class Config {
             saveConfig()
         }
     var bed_location: SerializableBlockPosDim? = null
+        set(value) {
+            field = value
+            saveConfig()
+        }
+    var network_file: String = defaultNetworkFile
         set(value) {
             field = value
             saveConfig()
@@ -125,12 +135,36 @@ class Config {
                         1
                     }))
         }
+        fun addStringSetting(x: KMutableProperty1<Config, String>) {
+            val defaultValue = x.get(Config())
+            builder = builder.then(ClientCommands.literal(x.name)
+                .executes { context ->
+                    sendFeedback(context, Component.nullToEmpty("Value of ${x.name}: ${x.get(this)}"))
+                    1
+                }
+                .then(ClientCommands.literal(defaultValue)
+                    .executes { context ->
+                        x.set(this, defaultValue)
+                        sendFeedback(context, Component.nullToEmpty("Reset ${x.name} to: $defaultValue"))
+                        1
+                    })
+                .then(ClientCommands.argument("str", StringArgumentType.greedyString())
+                    .executes { context ->
+                        val str = StringArgumentType.getString(context, "str")
+                        x.set(this, str)
+                        sendFeedback(context, Component.nullToEmpty("Set ${x.name} to: $str"))
+                        1
+                    }))
+        }
 
         @Suppress("UNCHECKED_CAST")
         for (field in Config::class.declaredMemberProperties) {
-            when {
-                field.returnType.classifier == Boolean::class -> {
+            when (field.returnType.classifier) {
+                Boolean::class -> {
                     addBooleanSetting(field as KMutableProperty1<Config, Boolean>)
+                }
+                String::class -> {
+                    addStringSetting(field as KMutableProperty1<Config, String>)
                 }
             }
         }
@@ -209,6 +243,36 @@ class Config {
 
     fun otherWidgets(parent: Screen): List<AbstractWidget> {
         val widgets = mutableListOf<AbstractWidget>()
+        val font = Minecraft.getInstance().font
+
+        fun addStringSetting(x: KMutableProperty1<Config, String>) {
+            val key = "config.nguhroutes.${x.name}"
+            val defaultValue = x.get(Config())
+
+            widgets.add(StringWidget(150, 20, Component.translatable(key), font))
+
+            val box = EditBox(font, 150, 20, Component.translatable(key))
+            box.setMaxLength(256)
+            val v = x.get(this)
+            box.value = if (v == defaultValue) "" else v
+            box.setResponder {
+                if (it.trim() == "") {
+                    x.set(this, defaultValue)
+                } else {
+                    x.set(this, it)
+                }
+            }
+            box.setTooltip(Tooltip.create(Component.translatable("$key.tooltip")))
+            box.setHint(Component.translatable("config.nguhroutes.empty_string_hint"))
+            widgets.add(box)
+        }
+
+        @Suppress("UNCHECKED_CAST")
+        for (field in Config::class.declaredMemberProperties) {
+            if (field.returnType.classifier == String::class) {
+                addStringSetting(field as KMutableProperty1<Config, String>)
+            }
+        }
 
         widgets.add(Button.builder(Component.translatable("config.nguhroutes.open_home_bed_config")) {
             Minecraft.getInstance().gui.setScreen(HomeBedConfigScreen(this, parent))
