@@ -392,6 +392,19 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                                 setRouteToCoord(context, Vec3(x, y, z), "the_nether")
                                 1
                             })))))
+        registerCommand(ClientCommands.literal("nrss")
+            .then(ClientCommands.argument("dest", StringArgumentType.greedyString())
+                .suggestStationNames()
+                .executes { context ->
+                    val dest = StringArgumentType.getString(context, "dest")
+                    val code = findCodeFromName(dest, context)
+                    if (code != null) {
+                        setRouteFromCurrentPos(context, code)
+                    } else {
+                        sendError(context, Component.literal("Could not find station with name \"$dest\""))
+                    }
+                    1
+                }))
         ClientTickEvents.END_LEVEL_TICK.register { clientWorld -> tick(clientWorld) }
         ClientPlayConnectionEvents.JOIN.register { _, _, _ ->
             if (config.update_notifications) {
@@ -1143,5 +1156,39 @@ class NguhroutesClient : ClientModInitializer, HudElement {
             }
             builder.buildFuture()
         }
+    }
+
+    fun <T> RequiredArgumentBuilder<FabricClientCommandSource, T>.suggestStationNames(): RequiredArgumentBuilder<FabricClientCommandSource, T> {
+        return this.suggests { context, builder ->
+            val nrData = getNRData(null, false)
+            val lastChild = context.lastChild
+            val lastNode = lastChild.nodes.last()
+            println("ABCD: ${lastNode.node.name} ; ${lastNode.range.get(lastChild.input)}")
+            if (nrData != null && lastNode.node.name == this.name) {
+                for (station in nrData.preCalcRoutes.stations.keys) {
+                    val names = nrData.network.stationNames[station] ?: continue
+                    for (name in names) {
+                        if (name.uppercase().startsWith(lastNode.range.get(lastChild.input).uppercase())) {
+                            builder.suggest(name)
+                        }
+                    }
+                }
+            }
+            builder.buildFuture()
+        }
+    }
+
+    fun findCodeFromName(name: String, context: CommandContext<FabricClientCommandSource>? = null): String? {
+        val upperName = name.uppercase()
+        val nrData = getNRData(context, true) ?: return null
+        for (station in nrData.preCalcRoutes.stations.keys) {
+            val names = nrData.network.stationNames[station] ?: continue
+            for (name in names) {
+                if (upperName == name.uppercase()) {
+                    return station
+                }
+            }
+        }
+        return null
     }
 }
