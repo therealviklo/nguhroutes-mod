@@ -21,6 +21,7 @@ import net.minecraft.client.DeltaTracker
 import net.minecraft.client.gui.components.toasts.SystemToast
 import com.mojang.blaze3d.platform.ClipboardManager
 import com.mojang.blaze3d.platform.InputConstants
+import com.mojang.brigadier.builder.RequiredArgumentBuilder
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper
 import net.minecraft.client.multiplayer.ClientLevel
 import net.minecraft.commands.CommandBuildContext
@@ -39,6 +40,9 @@ import net.minecraft.world.phys.Vec3
 import org.lwjgl.sdl.SDLScancode
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.collections.iterator
+import kotlin.io.iterator
+import kotlin.text.iterator
 
 const val warpTypingCost = 3.0
 
@@ -182,13 +186,16 @@ class NguhroutesClient : ClientModInitializer, HudElement {
                 })
             .then(ClientCommands.literal("start")
                 .then(ClientCommands.argument("dest", StringArgumentType.string())
+                    .suggestStations()
                     .executes { context ->
                         val dest = StringArgumentType.getString(context, "dest").uppercase()
                         setRouteFromCurrentPos(context, dest)
                         1
                     })
                 .then(ClientCommands.argument("start", StringArgumentType.string())
+                    .suggestStations()
                     .then(ClientCommands.argument("dest", StringArgumentType.string())
+                        .suggestStations()
                         .executes { context ->
                             val start = StringArgumentType.getString(context, "start").uppercase()
                             val dest = StringArgumentType.getString(context, "dest").uppercase()
@@ -351,13 +358,16 @@ class NguhroutesClient : ClientModInitializer, HudElement {
             listOf("nr"))
         registerCommand(ClientCommands.literal("nrs")
             .then(ClientCommands.argument("dest", StringArgumentType.string())
+                .suggestStations()
                 .executes { context ->
                     val dest = StringArgumentType.getString(context, "dest").uppercase()
                     setRouteFromCurrentPos(context, dest)
                     1
                 })
             .then(ClientCommands.argument("start", StringArgumentType.string())
+                .suggestStations()
                 .then(ClientCommands.argument("dest", StringArgumentType.string())
+                    .suggestStations()
                     .executes { context ->
                         val start = StringArgumentType.getString(context, "start").uppercase()
                         val dest = StringArgumentType.getString(context, "dest").uppercase()
@@ -1112,5 +1122,26 @@ class NguhroutesClient : ClientModInitializer, HudElement {
 
     private fun checkStringDim(dim: String, otherDim: String): Boolean {
         return Identifier.parse(dim) == Identifier.parse(otherDim)
+    }
+
+    fun <T> RequiredArgumentBuilder<FabricClientCommandSource, T>.suggestStations(): RequiredArgumentBuilder<FabricClientCommandSource, T> {
+        return this.suggests { context, builder ->
+            val nrData = getNRData(null, false)
+            val lastChild = context.lastChild
+            val lastNode = lastChild.nodes.last()
+            if (nrData != null && lastNode.node.name == this.name) {
+                for (station in nrData.preCalcRoutes.stations.keys) {
+                    if (station.startsWith(lastNode.range.get(lastChild.input).uppercase())) {
+                        builder.suggest(station)
+                    }
+                }
+                for (alias in nrData.network.aliases.keys) {
+                    if (alias.startsWith(lastNode.range.get(lastChild.input).uppercase())) {
+                        builder.suggest(alias)
+                    }
+                }
+            }
+            builder.buildFuture()
+        }
     }
 }
